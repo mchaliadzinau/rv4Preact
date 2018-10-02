@@ -1,0 +1,29 @@
+{
+  "name": "rv4preact",
+  "version": "0.0.1",
+  "description": "preact setup with no dependencies",
+  "main": "build.js",
+  "dependencies": {
+    "preact": "^8.3.1"
+  },
+  "devDependencies": {
+    "http-server": "^0.11.1"
+  },
+  "scripts": {
+    "start": "node_modules/.bin/http-server ./src",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rv4Flyver/rv4Preact.git"
+  },
+  "keywords": [
+    "preact"
+  ],
+  "author": "Mikalai.Chaliadzinau",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rv4Flyver/rv4Preact/issues"
+  },
+  "homepage": "https://github.com/rv4Flyver/rv4Preact#readme"
+}
