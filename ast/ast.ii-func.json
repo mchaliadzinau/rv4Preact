@@ -1,0 +1,9 @@
+{
+    "type": "ExpressionStatement",
+    "expression": {
+        "type": "CallExpression",
+        "callee": {
+        },
+        "arguments": []
+    }
+}

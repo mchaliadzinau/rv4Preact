@@ -1,0 +1,15 @@
+{
+    "type": "Property",
+    "method": false,
+    "shorthand": true,
+    "computed": false,
+    "key": {
+        "type": "Identifier",
+        "name": "PropertyKeyExample"
+    },
+    "kind": "init",
+    "value": {
+        "type": "Identifier",
+        "name": "PropertyValueExample"
+    }
+}

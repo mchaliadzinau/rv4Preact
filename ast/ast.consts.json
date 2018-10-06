@@ -13,8 +13,6 @@
             "computed": false,
             "key": {
               "type": "Identifier",
-              "start": 7,
-              "end": 8,
               "name": "a"
             },
             "kind": "init",

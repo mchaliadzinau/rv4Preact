@@ -1,0 +1,24 @@
+{
+    "type": "FunctionDeclaration",
+    "id": {
+        "type": "Identifier",
+        "name": "DefaultFuncName"
+    },
+    "expression": false,
+    "generator": false,
+    "async": false,
+    "params": [],
+    "body": {
+        "type": "BlockStatement",
+        "body": [
+            {
+                "type": "ReturnStatement",
+                "argument": {
+                    "type": "Literal",
+                    "value": "HELLO",
+                    "raw": "'HELLO'"
+                }
+            }
+        ]
+    }
+}

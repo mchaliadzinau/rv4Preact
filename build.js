@@ -2,8 +2,13 @@ const ACORN = require("acorn");
 const FS = require("fs");
 
 //
-const AST_CONSTS = require("./ast.consts.json");
-const AST_FUNC_NAMED = require("./ast.named-func.json")
+const AST_CONST = require("./ast/ast.const.json");
+const AST_CONSTS_SPREAD = require("./ast/ast.consts.spread.json");
+const AST_OBJ_PROP = require("./ast/ast.object-property.json");
+const AST_FUNC_IIFE = require("./ast/ast.ii-func.json");
+const AST_FUNC_NAMED = require("./ast/ast.named-func.json")
+const AST_FUNC_EXPRESSION = require("./ast/ast.func-expression.json");
+
 
 
 const SCRIPT = './src/index.js';
@@ -34,7 +39,21 @@ async function Walk(ast, dependenciesPlainGraph) {
         case "ImportDeclaration": {
             const mod = await HandleImportDeclaration(ast) ;
             dependenciesPlainGraph[ mod.name ] = mod.funcs;
-            return mod.funcs;
+            const constDef = Object.assign({},AST_CONST); // TO DO implement handler of several funcs [currently assumption is that default export only used]
+            Object.keys(mod.funcs).forEach(funcName=>{
+                // setup constants
+                constDef.declarations[0].id= {
+                    type: "Identifier",
+                    name: funcName
+                };
+                // initialize
+                constDef.declarations[0].init = {
+                    "type": "CallExpression",
+                    "callee": Object.assign({},mod.funcs[funcName]),
+                    "arguments": []
+                };
+            });
+            return constDef;
         }
         break;
         // case "ImportDefaultSpecifier": Walk(ast.local); break;
@@ -90,15 +109,10 @@ async function HandleImportDeclaration(ast) {
                     }
                     return e;
                 });
-                mod.funcs[name] = Object.assign({}, // 5
-                    AST_FUNC_NAMED,
-                    {
-                        id:{name}, 
-                        body:{
-                            body: [...moduleBody]
-                        }
-                    }
-                )
+                // 5
+                mod.funcs[name] = Object.assign({},AST_FUNC_EXPRESSION);
+                // mod.funcs[name].id = {name};
+                mod.funcs[name].body.body = [...moduleBody];
             }; break;
             case "ImportSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`
         }
