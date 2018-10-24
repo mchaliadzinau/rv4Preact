@@ -1,4 +1,5 @@
-import { Component, createElement, render } from '../lib/preact.mjs';
+import { Component, createElement, render } from '/libs/preact.mjs';
+import { ul, li } from '/utils/pelems.mjs';
 import Header from './header/Header.mjs'
 const h = createElement;
 
@@ -6,11 +7,11 @@ const h = createElement;
 class Main extends Component {
 	render() {
 		const items = [1,2,3,4,5].map( (item) => (
-			h('li', {id:item}, 'Item '+item)
+			li({id:item}, 'Item '+item)
 		));
 		return (
 			h('main', null,
-				h('ul', null, items)
+				ul(null, items)
 			)
 		);
 	}

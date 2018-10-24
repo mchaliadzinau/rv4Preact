@@ -1,4 +1,4 @@
-import { Component, createElement, render } from '../../lib/preact.mjs';
+import { Component, createElement, render } from '/libs/preact.mjs';
 const h = createElement;
 
 /** Components can just be pure functions */
