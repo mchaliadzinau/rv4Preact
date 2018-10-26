@@ -36,25 +36,20 @@ for(let i = 0; i < depCount; i++) {
     const moduleDestPath = path.resolve(libsPath, `${name}.mjs`);
     if(packageJSON.module) {
         const moduleSourcePath = path.resolve(packagePath, packageJSON.module);
-        FS.createReadStream( moduleSourcePath )
-        .pipe(FS.createWriteStream( moduleDestPath ));
+        try {
+            FS.createReadStream( moduleSourcePath )
+            .pipe(FS.createWriteStream( moduleDestPath ));
+        } catch (e) {
+            console.error(`ERROR:\t [${name + package.dependencies[name]}] Copying ${moduleSourcePath} to ${moduleDestPath} failed`, e);
+        }
         
-        console.log(`OK:\t ${name + package.dependencies[name]} is copied to ${moduleDestPath} directory.` );
+        console.log(`OK:\t [${name + package.dependencies[name]}] is copied to ${moduleDestPath}` );
     } else { // handle situations when package have no es6 module version
         switch (name) { // TO DO Rework to be able to use plugins instead hardcoded code
-            case 'tree': {
+            case 'tree': { // example of converting IIFE to es6 module
                 const scriptPath = path.resolve(packagePath, 'tree.js');
                 try {
-                    const data = FS.readFileSync(scriptPath);
-                    const ast = ACORN.parse(data, ACORN_OPTIONS);
-                    if(ast.body.length && ast.body[0].type === 'ExpressionStatement') {
-                        const moduleAST = Object.assign({},AST_EXPORT_DEFAULT, {
-                            declaration: ast.body[0]
-                        });
-                        const formattedCode = ASTRING.generate(moduleAST);
-
-                        FS.writeFileSync( moduleDestPath, formattedCode );
-                    }
+                    FS.writeFileSync( moduleDestPath, IIFE2MODULE(scriptPath) );
                 } catch(e) {
                     console.error('ERROR:\t Cannot read ' + name, e);
                 }
@@ -62,8 +57,21 @@ for(let i = 0; i < depCount; i++) {
             default: 
                 console.error('ERROR:\t ES6 module has not been found for ' + name);
         }    
-        console.log(`OK:\t ${name + package.dependencies[name]} is copied to ${moduleDestPath} directory.` );
+        console.log(`OK:\t [${name + package.dependencies[name]}] is copied to ${moduleDestPath}` );
     }
     
+}
+
+function IIFE2MODULE(scriptPath) {
+    const data = FS.readFileSync(scriptPath);
+    const ast = ACORN.parse(data, ACORN_OPTIONS);
+    if(ast.body.length && ast.body[0].type === 'ExpressionStatement' && ast.body[0].expression.type === 'CallExpression') {
+        const moduleAST = Object.assign({}, AST_EXPORT_DEFAULT, {
+            declaration: ast.body[0]
+        });
+        return ASTRING.generate(moduleAST);
+    } else {
+        throw new Error(`ERROR:\t IIFE not found in script ${scriptPath}`);
+    }
 }
 
