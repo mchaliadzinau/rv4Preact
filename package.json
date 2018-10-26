@@ -4,7 +4,8 @@
   "description": "preact setup with no dependencies",
   "main": "build.js",
   "dependencies": {
-    "preact": "^8.3.1"
+    "preact": "^8.3.1",
+    "tree": "^0.1.3"
   },
   "devDependencies": {
     "http-server": "^0.11.1",
