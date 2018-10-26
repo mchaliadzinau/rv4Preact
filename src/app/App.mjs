@@ -1,16 +1,16 @@
-import { Component, createElement, render } from '../lib/preact.mjs';
+import { Component } from '/libs/preact.mjs';
+import { _, div, ul, li, h1, h2 } from '/utils/pelems.mjs';
 import Header from './header/Header.mjs'
-const h = createElement;
 
 /** Instead of JSX, use: h(type, props, ...children) */
 class Main extends Component {
 	render() {
 		const items = [1,2,3,4,5].map( (item) => (
-			h('li', {id:item}, 'Item '+item)
+			li({id:item}, 'Item '+item)
 		));
 		return (
-			h('main', null,
-				h('ul', null, items)
+			div({class: 'main'}, 
+				ul(null, items)
 			)
 		);
 	}
@@ -22,9 +22,12 @@ export default class App extends Component {
 	}
 	render(props, state) {
 		return (
-			h('div', {id:'app'},
-				h(Header, { message: state.message }),
-				h(Main)
+			div({id:'app'},
+				Header({ message: state.message, onClickHandler : (e) => {alert('click inside header') }}, 
+					h1(null, "HEADER"),
+					h2(null, "LOWERHEADER"),
+				),
+				_(Main)(null)
 			)
 		);
 	}
