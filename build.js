@@ -1,6 +1,6 @@
 const ACORN = require("acorn");
 const FS = require("fs");
-
+const PATH = require("path");
 //
 const AST_CONST = require("./ast/ast.const.json");
 const AST_CONSTS_SPREAD = require("./ast/ast.consts.spread.json");
@@ -30,14 +30,14 @@ FS.readFile(SCRIPT, (err, data) => {
 /**
  * 1) Went through nodes
  */
-async function Walk(ast, dependenciesPlainGraph) {
+async function Walk(ast, dependenciesPlainGraph, scriptPath) {
     switch(ast.type) {
         case "Program": for(let i = 0; i < ast.body.length; i++) {
-            ast.body[i] = await Walk(ast.body[i], dependenciesPlainGraph);
+            ast.body[i] = await Walk(ast.body[i], dependenciesPlainGraph, scriptPath);
         }; break;
         // import
         case "ImportDeclaration": {
-            const mod = await HandleImportDeclaration(ast) ;
+            const mod = await HandleImportDeclaration(ast, dependenciesPlainGraph, scriptPath) ;
             dependenciesPlainGraph[ mod.name ] = mod.funcs;
             const constDef = Object.assign({},AST_CONST); // TO DO implement handler of several funcs [currently assumption is that default export only used]
             Object.keys(mod.funcs).forEach(funcName=>{
@@ -65,7 +65,7 @@ async function Walk(ast, dependenciesPlainGraph) {
 async function TestPoC(){
     const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
     const dependenciesPlainGraph = {};
-    PrettyPrint(await Walk(ast,dependenciesPlainGraph));
+    PrettyPrint(await Walk(ast,dependenciesPlainGraph,__dirname));
 }
 TestPoC();
 
@@ -82,14 +82,18 @@ TestPoC();
  * - ImportSpecifier
  *   .imported.type: "Identifier"
  *   .imported.name: String
- * @param {*} ast 
+  @param {} ast 
  */
-async function HandleImportDeclaration(ast) {
+async function HandleImportDeclaration(ast, dependenciesPlainGraph, scriptPath) {
     const specifiers = ast.specifiers;
     if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`
-    const sourcePath = ast.source.value;
+    const filePath = ast.source.value;
+    const fileName = PATH.basename(filePath);
+    const folderPath = filePath.indexOf('./') === 0 ? 
+        PATH.resolve( scriptPath, filePath.replace('./','').substring(0, filePath.replace('./','').lastIndexOf("/")) ) :
+        filePath.substring(0, filePath.lastIndexOf("/"));
     const mod = {
-        name : `${sourcePath.replace(/[./\\]/g,'_')}`,
+        name : `${filePath.replace(/[./\\]/g,'_')}`, // TO DO use relative path to project root
         funcs : {}
     };
     for(let i = 0; i < specifiers.length; i++) {
@@ -97,22 +101,23 @@ async function HandleImportDeclaration(ast) {
         switch(specifier.type) {
             case "ImportDefaultSpecifier": {               
                 const name = `${specifier.local.name}`;
-                const codeStr = await ReadFile(sourcePath);
+                const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
                 const ast = ACORN.parse(codeStr, ACORN_OPTIONS);
                 const body = ast.body; //2
-                const moduleBody = body.map(e=>{ //3
+                for(let i=0; i < body.length; i++ ) { //3
+                    const e = body[i];
                     if(e.type==='ExportDefaultDeclaration') { // 4
-                        return {
+                        body[i] = {
                             type: "ReturnStatement",
                             argument: Object.assign({}, e.declaration, {start: undefined, end: undefined})
                         }
                     }
-                    return e;
-                });
+                    body[i] = await Walk(e, dependenciesPlainGraph, folderPath);
+                };
                 // 5
                 mod.funcs[name] = Object.assign({},AST_FUNC_EXPRESSION);
                 // mod.funcs[name].id = {name};
-                mod.funcs[name].body.body = [...moduleBody];
+                mod.funcs[name].body.body = [...body];
             }; break;
             case "ImportSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`
         }
@@ -132,6 +137,7 @@ async function HandleImportDeclaration(ast) {
 
 function ReadFile(path) {
     return new Promise((resolve,reject) => {
+        console.log(path);
         FS.readFile(path, (err, data) => {
             if (err) throw reject(err);
             resolve(data);
