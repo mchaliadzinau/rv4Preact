@@ -8,6 +8,8 @@ const AST_OBJ_PROP = require("./ast/ast.object-property.json");
 const AST_FUNC_IIFE = require("./ast/ast.ii-func.json");
 const AST_FUNC_NAMED = require("./ast/ast.named-func.json")
 const AST_FUNC_EXPRESSION = require("./ast/ast.func-expression.json");
+const AST_STATEMENTS = require("./ast/ast.statements.json");
+const AST_MISC = require("./ast/ast.misc.json");
 
 
 
@@ -40,6 +42,9 @@ async function Walk(ast, dependenciesPlainGraph, scriptPath) {
             const mod = await HandleImportDeclaration(ast, dependenciesPlainGraph, scriptPath) ;
             dependenciesPlainGraph[ mod.name ] = mod.funcs;
             const constDef = Object.assign({},AST_CONST); // TO DO implement handler of several funcs [currently assumption is that default export only used]
+                constDef.declarations = [
+                    Object.assign({},AST_MISC.variable)
+                ] // TO DO Refactor AST_CONST
             Object.keys(mod.funcs).forEach(funcName=>{
                 // setup constants
                 constDef.declarations[0].id= {
@@ -107,15 +112,24 @@ async function HandleImportDeclaration(ast, dependenciesPlainGraph, scriptPath) 
                 for(let i=0; i < body.length; i++ ) { //3
                     const e = body[i];
                     if(e.type==='ExportDefaultDeclaration') { // 4
+                        if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
                         body[i] = {
                             type: "ReturnStatement",
-                            argument: Object.assign({}, e.declaration, {start: undefined, end: undefined})
+                            argument: Object.assign({}, e.declaration.right, {start: undefined, end: undefined})
                         }
+                        } else {
+                            body[i] = {
+                                type: "ReturnStatement",
+                                argument: Object.assign({}, e.declaration, {start: undefined, end: undefined})
+                            }
+                        }
+                    } else {
+                        body[i] = await Walk(e, dependenciesPlainGraph, folderPath);
                     }
-                    body[i] = await Walk(e, dependenciesPlainGraph, folderPath);
                 };
                 // 5
                 mod.funcs[name] = Object.assign({},AST_FUNC_EXPRESSION);
+                mod.funcs[name].body = Object.assign({},AST_STATEMENTS.block);
                 // mod.funcs[name].id = {name};
                 mod.funcs[name].body.body = [...body];
             }; break;
@@ -137,7 +151,7 @@ async function HandleImportDeclaration(ast, dependenciesPlainGraph, scriptPath) 
 
 function ReadFile(path) {
     return new Promise((resolve,reject) => {
-        console.log(path);
+        // console.log(path);
         FS.readFile(path, (err, data) => {
             if (err) throw reject(err);
             resolve(data);
