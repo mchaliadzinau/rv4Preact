@@ -6,7 +6,7 @@ const AST_CONST = require("./ast/ast.const.json");
 const AST_CONSTS_SPREAD = require("./ast/ast.consts.spread.json");
 const AST_OBJ_PROP = require("./ast/ast.object-property.json");
 const AST_FUNC_IIFE = require("./ast/ast.ii-func.json");
-const AST_FUNC_NAMED = require("./ast/ast.named-func.json")
+const AST_FUNC_NAMED = require("./ast/ast.named-func.json");
 const AST_FUNC_EXPRESSION = require("./ast/ast.func-expression.json");
 const AST_STATEMENTS = require("./ast/ast.statements.json");
 const AST_MISC = require("./ast/ast.misc.json");
@@ -14,6 +14,7 @@ const AST_MISC = require("./ast/ast.misc.json");
 
 
 const SCRIPT = './src/index.js';
+const ROOT = __dirname;
 const ACORN_OPTIONS = {
     ecmaVersion: 7,
     sourceType: 'module'
@@ -32,19 +33,19 @@ FS.readFile(SCRIPT, (err, data) => {
 /**
  * 1) Went through nodes
  */
-async function Walk(ast, dependenciesPlainGraph, scriptPath) {
+async function Walk(ast, deps, scriptPath) {
     switch(ast.type) {
         case "Program": for(let i = 0; i < ast.body.length; i++) {
-            ast.body[i] = await Walk(ast.body[i], dependenciesPlainGraph, scriptPath);
+            ast.body[i] = await Walk(ast.body[i], deps, scriptPath);
         }; break;
         // import
         case "ImportDeclaration": {
-            const mod = await HandleImportDeclaration(ast, dependenciesPlainGraph, scriptPath) ;
-            dependenciesPlainGraph[ mod.name ] = mod.funcs;
+            const mod = await HandleImportDeclaration(ast, deps, scriptPath) ;
+            deps[ mod.name ] = mod.funcs;
             const constDef = Object.assign({},AST_CONST); // TO DO implement handler of several funcs [currently assumption is that default export only used]
                 constDef.declarations = [
                     Object.assign({},AST_MISC.variable)
-                ] // TO DO Refactor AST_CONST
+                ]; // TO DO Refactor AST_CONST
             Object.keys(mod.funcs).forEach(funcName=>{
                 // setup constants
                 constDef.declarations[0].id= {
@@ -69,8 +70,19 @@ async function Walk(ast, dependenciesPlainGraph, scriptPath) {
 
 async function TestPoC(){
     const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
-    const dependenciesPlainGraph = {};
-    PrettyPrint(await Walk(ast,dependenciesPlainGraph,__dirname));
+    const deps = {};
+    ast.body.unshift({
+        "type": "VariableDeclarator",
+        "id": {
+          "type": "Identifier",
+          "name": "____rv4EXPORT____"
+        },
+        "init": {
+            "type": "ObjectExpression",
+            "properties": []
+        }
+    })
+    PrettyPrint(await Walk(ast,deps,__dirname));
 }
 TestPoC();
 
@@ -89,23 +101,24 @@ TestPoC();
  *   .imported.name: String
   @param {} ast 
  */
-async function HandleImportDeclaration(ast, dependenciesPlainGraph, scriptPath) {
+async function HandleImportDeclaration(ast, deps, scriptPath) {
     const specifiers = ast.specifiers;
-    if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`
+    if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`;
     const filePath = ast.source.value;
     const fileName = PATH.basename(filePath);
     const folderPath = filePath.indexOf('./') === 0 ? 
         PATH.resolve( scriptPath, filePath.replace('./','').substring(0, filePath.replace('./','').lastIndexOf("/")) ) :
         filePath.substring(0, filePath.lastIndexOf("/"));
-    const mod = {
-        name : `${filePath.replace(/[./\\]/g,'_')}`, // TO DO use relative path to project root
-        funcs : {}
-    };
+    
+    const relativeFilePath = `${filePath.replace(ROOT,'')}`;
+    const alreadyExists = deps[relativeFilePath];
+    deps[relativeFilePath] = alreadyExists ? deps[relativeFilePath] : {}; 
+
     for(let i = 0; i < specifiers.length; i++) {
         const specifier = specifiers[i];
         switch(specifier.type) {
             case "ImportDefaultSpecifier": {               
-                const name = `${specifier.local.name}`;
+                // const name = `${specifier.local.name}`;
                 const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
                 const ast = ACORN.parse(codeStr, ACORN_OPTIONS);
                 const body = ast.body; //2
@@ -113,27 +126,27 @@ async function HandleImportDeclaration(ast, dependenciesPlainGraph, scriptPath) 
                     const e = body[i];
                     if(e.type==='ExportDefaultDeclaration') { // 4
                         if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
-                        body[i] = {
-                            type: "ReturnStatement",
-                            argument: Object.assign({}, e.declaration.right, {start: undefined, end: undefined})
-                        }
+                            body[i] = {
+                                type: "ReturnStatement",
+                                argument: Object.assign({}, e.declaration.right, {start: undefined, end: undefined})
+                            };
                         } else {
                             body[i] = {
                                 type: "ReturnStatement",
                                 argument: Object.assign({}, e.declaration, {start: undefined, end: undefined})
-                            }
+                            };
                         }
                     } else {
-                        body[i] = await Walk(e, dependenciesPlainGraph, folderPath);
+                        body[i] = await Walk(e, deps, folderPath);
                     }
                 };
                 // 5
-                mod.funcs[name] = Object.assign({},AST_FUNC_EXPRESSION);
-                mod.funcs[name].body = Object.assign({},AST_STATEMENTS.block);
-                // mod.funcs[name].id = {name};
-                mod.funcs[name].body.body = [...body];
+                es6module.exports['___rv4.DEFAULT'] = Object.assign({},AST_FUNC_EXPRESSION);
+                es6module.exports['___rv4.DEFAULT'].body = Object.assign({},AST_STATEMENTS.block);
+                // es6module.exports['__rv4.DEFAULT'].id = {name};
+                es6module.exports['___rv4.DEFAULT'].body.body = [...body];
             }; break;
-            case "ImportSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`
+        case "ImportSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`;
         }
     }
     return Promise.resolve(mod);
@@ -155,6 +168,6 @@ function ReadFile(path) {
         FS.readFile(path, (err, data) => {
             if (err) throw reject(err);
             resolve(data);
-        })
-    }) 
+        });
+    }) ;
 }
