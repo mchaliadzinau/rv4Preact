@@ -37,14 +37,12 @@ FS.readFile(SCRIPT, (err, data) => {
 async function Walk(ast, deps, scriptPath) {
     switch(ast.type) {
         case "Program": for(let i = 0; i < ast.body.length; i++) {
-            ast.body[i] = await Walk(ast.body[i], deps, scriptPath);
+            const dep2const = await Walk(ast.body[i], deps, scriptPath);
+            ast.body[i] = dep2const;
         }; break;
         // import
-        case "ImportDeclaration": {
+        case "ImportDeclaration": 
             return await HandleImportDeclaration(ast, deps, scriptPath) ;
-        }
-        break;
-        // case "ImportDefaultSpecifier": Walk(ast.local); break;
     }
     // console.log('Walk complete!');
     return Promise.resolve(ast);
@@ -113,6 +111,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             const name = `${specifier.local.name}`;
             //> const `name` = ...
             const constAst = Object.assign({}, AST_CONST);
+                constAst.declarations[0] = Object.assign({}, AST_MISC.variable)
                 constAst.declarations[0].id = {"type": "Identifier", "name": name};
                 constAst.declarations[0].init = null; // populated below depending on the state of dependency
                 
@@ -132,19 +131,19 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 depExportExprAst.expression.right = null; // TO BE CONTINUED
 
                 const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
-                const ast = ACORN.parse(codeStr, ACORN_OPTIONS);
-                const depBodyAst = ast.body; //2
-                for(let i=0; i < depBodyAst.length; i++ ) { //3
-                    const e = depBodyAst[i];
+                const moduleAst = ACORN.parse(codeStr, ACORN_OPTIONS);
+
+                for(let i=0; i < moduleAst.body.length; i++ ) { //3
+                    const e = moduleAst.body[i];
                     if(e.type==='ExportDefaultDeclaration') { // 4
                         if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
                             depExportExprAst.expression.right = e.declaration.right;
                         } else {
                             depExportExprAst.expression.right = e.declaration;
                         }
-                        depBodyAst[i] = depExportExprAst.expression.right;
+                        moduleAst.body[i] = depExportExprAst;
                     } else {
-                        depBodyAst[i] = await Walk(e, deps, folderPath);
+                        moduleAst.body[i] = await Walk(e, deps, folderPath);
                     }
                 };
 
@@ -156,7 +155,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                     "arguments": []
                 };
                 depInitExprAst.expression.callee.body = Object.assign({},AST_STATEMENTS.block);
-                depInitExprAst.expression.callee.body.body = depBodyAst;
+                depInitExprAst.expression.callee.body.body = moduleAst.body;
                 
                 deps[relativeFilePath][____rv4DEFEXPORT_] = depInitExprAst;
             }
