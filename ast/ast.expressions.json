@@ -1,0 +1,27 @@
+{
+    "expression": {
+        "type": "ExpressionStatement",
+        "expression": { }
+    },
+    "assignment": {
+        "type": "AssignmentExpression",
+        "operator": "=",
+        "left": { },
+        "right": { }
+    },
+    "member": {
+        "type": "MemberExpression",
+        "object": { },
+        "property": { },
+        "computed": true
+    },
+    "function": {
+        "type": "FunctionExpression",
+        "id": null,
+        "expression": false,
+        "generator": false,
+        "async": false,
+        "params": [],
+        "body": { }
+    }
+}

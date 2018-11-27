@@ -6,6 +6,9 @@
     "return": {
         "type": "ReturnStatement",
         "argument": { }
+    },
+    "expression": {
+        "type": "ExpressionStatement",
+        "expression": { }
     }
-    
 }

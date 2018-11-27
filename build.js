@@ -7,18 +7,19 @@ const AST_CONSTS_SPREAD = require("./ast/ast.consts.spread.json");
 const AST_OBJ_PROP = require("./ast/ast.object-property.json");
 const AST_FUNC_IIFE = require("./ast/ast.ii-func.json");
 const AST_FUNC_NAMED = require("./ast/ast.named-func.json");
-const AST_FUNC_EXPRESSION = require("./ast/ast.func-expression.json");
+const AST_EXPRESSIONS = require("./ast/ast.expressions.json");
 const AST_STATEMENTS = require("./ast/ast.statements.json");
 const AST_MISC = require("./ast/ast.misc.json");
 
-
+const ____rv4EXPORT____ = '____rv4EXPORT____';
+const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
 
 const SCRIPT = './src/index.js';
 const ROOT = __dirname;
 const ACORN_OPTIONS = {
     ecmaVersion: 7,
     sourceType: 'module'
-}
+};
 
 function PrettyPrint(json) {
     console.log( JSON.stringify(json, null, 2) );
@@ -40,26 +41,7 @@ async function Walk(ast, deps, scriptPath) {
         }; break;
         // import
         case "ImportDeclaration": {
-            const mod = await HandleImportDeclaration(ast, deps, scriptPath) ;
-            deps[ mod.name ] = mod.funcs;
-            const constDef = Object.assign({},AST_CONST); // TO DO implement handler of several funcs [currently assumption is that default export only used]
-                constDef.declarations = [
-                    Object.assign({},AST_MISC.variable)
-                ]; // TO DO Refactor AST_CONST
-            Object.keys(mod.funcs).forEach(funcName=>{
-                // setup constants
-                constDef.declarations[0].id= {
-                    type: "Identifier",
-                    name: funcName
-                };
-                // initialize
-                constDef.declarations[0].init = {
-                    "type": "CallExpression",
-                    "callee": Object.assign({},mod.funcs[funcName]),
-                    "arguments": []
-                };
-            });
-            return constDef;
+            return await HandleImportDeclaration(ast, deps, scriptPath) ;
         }
         break;
         // case "ImportDefaultSpecifier": Walk(ast.local); break;
@@ -71,17 +53,24 @@ async function Walk(ast, deps, scriptPath) {
 async function TestPoC(){
     const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
     const deps = {};
-    ast.body.unshift({
-        "type": "VariableDeclarator",
-        "id": {
-          "type": "Identifier",
-          "name": "____rv4EXPORT____"
-        },
-        "init": {
-            "type": "ObjectExpression",
-            "properties": []
-        }
-    })
+    ast.body.unshift({ // const ____rv4EXPORT____={}
+        "type": "VariableDeclaration",
+        "declarations": [
+            {
+                "type": "VariableDeclarator",
+                "id": {
+                    "type": "Identifier",
+                    "name": ____rv4EXPORT____
+                },
+                "init": {
+                    "type": "ObjectExpression",
+                    "properties": []
+                }
+            }
+        ],
+        "kind": "const"
+        
+    });
     PrettyPrint(await Walk(ast,deps,__dirname));
 }
 TestPoC();
@@ -96,6 +85,9 @@ TestPoC();
  * - ImportDefaultSpecifier
  *   .local.type: "Identifier"
  *   .locall.name: String
+ * - ImportNamespaceSpecifier
+ *   .local.type: "Identifier"
+ *   .locall.name: String
  * - ImportSpecifier
  *   .imported.type: "Identifier"
  *   .imported.name: String
@@ -106,46 +98,71 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`;
     const filePath = ast.source.value;
     const fileName = PATH.basename(filePath);
-    const folderPath = filePath.indexOf('./') === 0 ? 
+    const folderPath = filePath.indexOf('./') === 0 ?
         PATH.resolve( scriptPath, filePath.replace('./','').substring(0, filePath.replace('./','').lastIndexOf("/")) ) :
         filePath.substring(0, filePath.lastIndexOf("/"));
-    
+
     const relativeFilePath = `${filePath.replace(ROOT,'')}`;
-    const alreadyExists = deps[relativeFilePath];
-    deps[relativeFilePath] = alreadyExists ? deps[relativeFilePath] : {}; 
+    const alreadyResolved = deps[relativeFilePath];
+    deps[relativeFilePath] = !!alreadyResolved ? deps[relativeFilePath] : {};
 
     for(let i = 0; i < specifiers.length; i++) {
         const specifier = specifiers[i];
         switch(specifier.type) {
-            case "ImportDefaultSpecifier": {               
-                // const name = `${specifier.local.name}`;
+        case "ImportDefaultSpecifier": {
+            const name = `${specifier.local.name}`;
+            //> const `name` = ...
+            const constAst = Object.assign({}, AST_CONST);
+                constAst.declarations[0].id = {"type": "Identifier", "name": name};
+                constAst.declarations[0].init = null; // populated below depending on the state of dependency
+                
+            //> ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_]
+            const dependencyAst = Object.assign({}, AST_EXPRESSIONS.member);
+                dependencyAst.object =             Object.assign({}, AST_EXPRESSIONS.member);
+                dependencyAst.object.object   =    { "type": "Identifier", "name": ____rv4EXPORT____};
+                dependencyAst.object.property =    { "type": "Literal", "value": relativeFilePath, "raw": `"'${relativeFilePath}'"`}
+                dependencyAst.property =   { "type": "Literal", "value": ____rv4DEFEXPORT_, "raw": `"'${____rv4DEFEXPORT_}'"`}
+            //> const `name` = ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_];
+            constAst.declarations[0].init = dependencyAst;
+            // DEPENDENCY
+            if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
+                const depExportExprAst = Object.assign({},  AST_EXPRESSIONS.expression);
+                depExportExprAst.expression = Object.assign({}, AST_EXPRESSIONS.assignment);
+                depExportExprAst.expression.left = dependencyAst;
+                depExportExprAst.expression.right = null; // TO BE CONTINUED
+
                 const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
                 const ast = ACORN.parse(codeStr, ACORN_OPTIONS);
-                const body = ast.body; //2
-                for(let i=0; i < body.length; i++ ) { //3
-                    const e = body[i];
+                const depBodyAst = ast.body; //2
+                for(let i=0; i < depBodyAst.length; i++ ) { //3
+                    const e = depBodyAst[i];
                     if(e.type==='ExportDefaultDeclaration') { // 4
                         if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
-                            body[i] = {
-                                type: "ReturnStatement",
-                                argument: Object.assign({}, e.declaration.right, {start: undefined, end: undefined})
-                            };
+                            depExportExprAst.expression.right = e.declaration.right;
                         } else {
-                            body[i] = {
-                                type: "ReturnStatement",
-                                argument: Object.assign({}, e.declaration, {start: undefined, end: undefined})
-                            };
+                            depExportExprAst.expression.right = e.declaration;
                         }
+                        depBodyAst[i] = depExportExprAst.expression.right;
                     } else {
-                        body[i] = await Walk(e, deps, folderPath);
+                        depBodyAst[i] = await Walk(e, deps, folderPath);
                     }
                 };
-                // 5
-                es6module.exports['___rv4.DEFAULT'] = Object.assign({},AST_FUNC_EXPRESSION);
-                es6module.exports['___rv4.DEFAULT'].body = Object.assign({},AST_STATEMENTS.block);
-                // es6module.exports['__rv4.DEFAULT'].id = {name};
-                es6module.exports['___rv4.DEFAULT'].body.body = [...body];
-            }; break;
+
+                //> ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_] = (function(){moduleBody})()
+                const depInitExprAst = Object.assign({},  AST_EXPRESSIONS.expression);
+                depInitExprAst.expression = {
+                    "type": "CallExpression",
+                    "callee": Object.assign({}, Object.assign({},AST_EXPRESSIONS.function)),
+                    "arguments": []
+                };
+                depInitExprAst.expression.callee.body = Object.assign({},AST_STATEMENTS.block);
+                depInitExprAst.expression.callee.body.body = depBodyAst;
+                
+                deps[relativeFilePath][____rv4DEFEXPORT_] = depInitExprAst;
+            }
+            return Promise.resolve(constAst);
+        }; break;
+        case "ImportNamespaceSpecifier": 
         case "ImportSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`;
         }
     }
