@@ -50,8 +50,13 @@ async function Walk(ast, deps, scriptPath) {
 
 async function TestPoC(){
     const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
-    const deps = {};
-    ast.body.unshift({ // const ____rv4EXPORT____={}
+    const deps = {
+        '$order': []
+    };
+    const processedAst = await Walk(ast,deps,__dirname);
+
+    const modules = [];
+    modules.push({ // const ____rv4EXPORT____={}
         "type": "VariableDeclaration",
         "declarations": [
             {
@@ -69,7 +74,13 @@ async function TestPoC(){
         "kind": "const"
         
     });
-    PrettyPrint(await Walk(ast,deps,__dirname));
+    for(dep of deps.$order) {
+        // TO DO implement init of ____rv4EXPORT____[path] on first assignment of dependency initialization function
+        modules.push(deps[dep.path][dep.name]);
+    }
+    processedAst.body = modules.concat(processedAst.body);
+
+    PrettyPrint(processedAst);
 }
 TestPoC();
 
@@ -101,8 +112,8 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
         filePath.substring(0, filePath.lastIndexOf("/"));
 
     const relativeFilePath = `${filePath.replace(ROOT,'')}`;
-    const alreadyResolved = deps[relativeFilePath];
-    deps[relativeFilePath] = !!alreadyResolved ? deps[relativeFilePath] : {};
+    const alreadyResolved = !!deps[relativeFilePath];
+    deps[relativeFilePath] = alreadyResolved ? deps[relativeFilePath] : {};
 
     for(let i = 0; i < specifiers.length; i++) {
         const specifier = specifiers[i];
@@ -111,6 +122,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             const name = `${specifier.local.name}`;
             //> const `name` = ...
             const constAst = Object.assign({}, AST_CONST);
+                constAst.declarations = [];
                 constAst.declarations[0] = Object.assign({}, AST_MISC.variable)
                 constAst.declarations[0].id = {"type": "Identifier", "name": name};
                 constAst.declarations[0].init = null; // populated below depending on the state of dependency
@@ -158,6 +170,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 depInitExprAst.expression.callee.body.body = moduleAst.body;
                 
                 deps[relativeFilePath][____rv4DEFEXPORT_] = depInitExprAst;
+                deps.$order.push({path: relativeFilePath, name : ____rv4DEFEXPORT_});
             }
             return Promise.resolve(constAst);
         }; break;
