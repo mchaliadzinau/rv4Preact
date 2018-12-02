@@ -23,5 +23,27 @@
         "async": false,
         "params": [],
         "body": { }
+    },
+    "conditional": {
+        "type": "ConditionalExpression",
+        "test": {
+          "type": "MemberExpression",
+          "object": null,
+          "property": null,
+          "computed": true
+        },
+        "consequent": {
+          "type": "MemberExpression",
+          "object": null,
+          "property": null,
+          "computed": true
+        },
+        "alternate": {
+            "type": "ObjectExpression"
+        }
+    },
+    "object": {
+        "type": "ObjectExpression",
+        "properties": []
     }
 }

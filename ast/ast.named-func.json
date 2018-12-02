@@ -8,17 +8,5 @@
     "generator": false,
     "async": false,
     "params": [],
-    "body": {
-        "type": "BlockStatement",
-        "body": [
-            {
-                "type": "ReturnStatement",
-                "argument": {
-                    "type": "Literal",
-                    "value": "HELLO",
-                    "raw": "'HELLO'"
-                }
-            }
-        ]
-    }
+    "body": null
 }

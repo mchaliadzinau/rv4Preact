@@ -13,6 +13,7 @@ const AST_MISC = require("./ast/ast.misc.json");
 
 const ____rv4EXPORT____ = '____rv4EXPORT____';
 const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
+const ____rv4SET_EXPORT____ = '____rv4SET_EXPORT____';
 
 const SCRIPT = './src/index.js';
 const ROOT = __dirname;
@@ -74,8 +75,56 @@ async function TestPoC(){
         "kind": "const"
         
     });
+    // "function ____rv4SET_EXPORT____(path,name,value) {
+    //    ____rv4EXPORT____[path] = ____rv4EXPORT____[path] ? ____rv4EXPORT____[path] : {};
+    //    ____rv4EXPORT____[path][name] = value;
+    // }"
+    modules.push(Object.assign({},AST_FUNC_NAMED,{
+        "id": { "type": "Identifier", "name": "____rv4SET_EXPORT____"},
+        "params": [
+            {"type": "Identifier","name": "path"},
+            {"type": "Identifier","name": "name"},
+            {"type": "Identifier","name": "value"}
+        ],
+        "body": Object.assign({}, AST_STATEMENTS.block, {
+            "body": [
+                Object.assign({}, AST_STATEMENTS.expression, {
+                    "expression": Object.assign({}, AST_EXPRESSIONS.assignment, {
+                        "left": Object.assign({}, AST_EXPRESSIONS.member, {
+                            "object":   {"type": "Identifier","name": ____rv4EXPORT____},
+                            "property": {"type": "Identifier", "name": "path"},
+                        }),
+                        "right": Object.assign({}, AST_EXPRESSIONS.conditional, {
+                            "test": Object.assign({}, AST_EXPRESSIONS.member, {
+                                "object":   {"type": "Identifier","name": ____rv4EXPORT____},
+                                "property": {"type": "Identifier","name": "path"},
+                            }),
+                            "consequent": Object.assign({}, AST_EXPRESSIONS.member, {
+                                "object":   {"type": "Identifier","name": ____rv4EXPORT____},
+                                "property": {"type": "Identifier","name": "path"}
+                            }),
+                            "alternate":  Object.assign({}, AST_EXPRESSIONS.object, {
+                                "properties": []
+                            })
+                        })
+                    })
+                }),
+                Object.assign({}, AST_STATEMENTS.expression, {
+                    "expression": Object.assign({}, AST_EXPRESSIONS.assignment, {
+                        "left": Object.assign({}, AST_EXPRESSIONS.member, {
+                            "object":    Object.assign({}, AST_EXPRESSIONS.member, {
+                                "object":   {"type": "Identifier","name": ____rv4EXPORT____},
+                                "property": {"type": "Identifier","name": "path"},
+                            }),
+                            "property": {"type": "Identifier", "name": "name"},
+                        }),
+                        "right": {"type": "Identifier","name": "value"}
+                    })
+                })
+            ]
+        })
+    }));
     for(dep of deps.$order) {
-        // TO DO implement init of ____rv4EXPORT____[path] on first assignment of dependency initialization function
         modules.push(deps[dep.path][dep.name]);
     }
     processedAst.body = modules.concat(processedAst.body);
@@ -137,10 +186,18 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             constAst.declarations[0].init = dependencyAst;
             // DEPENDENCY
             if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
-                const depExportExprAst = Object.assign({},  AST_EXPRESSIONS.expression);
-                depExportExprAst.expression = Object.assign({}, AST_EXPRESSIONS.assignment);
-                depExportExprAst.expression.left = dependencyAst;
-                depExportExprAst.expression.right = null; // TO BE CONTINUED
+                // ____rv4EXPORT____(relativeFilePath, ____rv4DEFEXPORT_, value);
+                const setDependencyFuncCallAst =     {
+                    "type": "ExpressionStatement",
+                    "expression": {
+                      "type": "CallExpression",
+                      "callee": {"type": "Identifier","name": ____rv4SET_EXPORT____},
+                      "arguments": [
+                        { "type": "Literal", "value": relativeFilePath, "raw": `"'${relativeFilePath}'"`},   // path
+                        { "type": "Literal", "value": ____rv4DEFEXPORT_, "raw": `"'${____rv4DEFEXPORT_}'"`} // depencency name
+                      ]
+                    }
+                }
 
                 const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
                 const moduleAst = ACORN.parse(codeStr, ACORN_OPTIONS);
@@ -149,11 +206,11 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                     const e = moduleAst.body[i];
                     if(e.type==='ExportDefaultDeclaration') { // 4
                         if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
-                            depExportExprAst.expression.right = e.declaration.right;
+                            setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration.right);
                         } else {
-                            depExportExprAst.expression.right = e.declaration;
+                            setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration);
                         }
-                        moduleAst.body[i] = depExportExprAst;
+                        moduleAst.body[i] = setDependencyFuncCallAst;
                     } else {
                         moduleAst.body[i] = await Walk(e, deps, folderPath);
                     }
