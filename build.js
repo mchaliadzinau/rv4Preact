@@ -157,10 +157,10 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     const filePath = ast.source.value;
     const fileName = PATH.basename(filePath);
     const folderPath = filePath.indexOf('./') === 0 ?
-        PATH.resolve( scriptPath, filePath.replace('./','').substring(0, filePath.replace('./','').lastIndexOf("/")) ) :
+        PATH.resolve( scriptPath, filePath.replace('./','').substring(0, filePath.replace('./','').lastIndexOf('/')) ) :
         filePath.substring(0, filePath.lastIndexOf("/"));
 
-    const relativeFilePath = `${filePath.replace(ROOT,'')}`;
+    const relativeFilePath = `${folderPath.replace(ROOT + '/','')}` + filePath.substring( filePath.lastIndexOf('/') );
     const alreadyResolved = !!deps[relativeFilePath];
     deps[relativeFilePath] = alreadyResolved ? deps[relativeFilePath] : {};
 
