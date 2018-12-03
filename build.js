@@ -218,7 +218,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
         case "ImportSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`;
         }
     }
-    return Promise.resolve(mod);
+    return Promise.reject({error: "Unhandled Import Declaration case!"});
 }
 
 // import App from './app/App.mjs'; 
