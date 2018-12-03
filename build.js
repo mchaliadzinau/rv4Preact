@@ -3,13 +3,12 @@ const FS = require("fs");
 const PATH = require("path");
 //
 const AST_CONST = require("./ast/ast.const.json");
-const AST_CONSTS_SPREAD = require("./ast/ast.consts.spread.json");
-const AST_OBJ_PROP = require("./ast/ast.object-property.json");
-const AST_FUNC_IIFE = require("./ast/ast.ii-func.json");
 const AST_FUNC_NAMED = require("./ast/ast.named-func.json");
 const AST_EXPRESSIONS = require("./ast/ast.expressions.json");
 const AST_STATEMENTS = require("./ast/ast.statements.json");
 const AST_MISC = require("./ast/ast.misc.json");
+
+const {MemberExpression, ObjectExpression, Identifier, Literal} = require("./ast/astUtils.js");
 
 const ____rv4EXPORT____ = '____rv4EXPORT____';
 const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
@@ -62,14 +61,8 @@ async function TestPoC(){
         "declarations": [
             {
                 "type": "VariableDeclarator",
-                "id": {
-                    "type": "Identifier",
-                    "name": ____rv4EXPORT____
-                },
-                "init": {
-                    "type": "ObjectExpression",
-                    "properties": []
-                }
+                "id": Identifier(____rv4EXPORT____),
+                "init": ObjectExpression()
             }
         ],
         "kind": "const"
@@ -82,43 +75,31 @@ async function TestPoC(){
     modules.push(Object.assign({},AST_FUNC_NAMED,{
         "id": { "type": "Identifier", "name": "____rv4SET_EXPORT____"},
         "params": [
-            {"type": "Identifier","name": "path"},
-            {"type": "Identifier","name": "name"},
-            {"type": "Identifier","name": "value"}
+            Identifier("path"),
+            Identifier("name"),
+            Identifier("value")
         ],
         "body": Object.assign({}, AST_STATEMENTS.block, {
             "body": [
                 Object.assign({}, AST_STATEMENTS.expression, {
                     "expression": Object.assign({}, AST_EXPRESSIONS.assignment, {
-                        "left": Object.assign({}, AST_EXPRESSIONS.member, {
-                            "object":   {"type": "Identifier","name": ____rv4EXPORT____},
-                            "property": {"type": "Identifier", "name": "path"},
-                        }),
+                        "left": MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
                         "right": Object.assign({}, AST_EXPRESSIONS.conditional, {
-                            "test": Object.assign({}, AST_EXPRESSIONS.member, {
-                                "object":   {"type": "Identifier","name": ____rv4EXPORT____},
-                                "property": {"type": "Identifier","name": "path"},
-                            }),
-                            "consequent": Object.assign({}, AST_EXPRESSIONS.member, {
-                                "object":   {"type": "Identifier","name": ____rv4EXPORT____},
-                                "property": {"type": "Identifier","name": "path"}
-                            }),
-                            "alternate":  Object.assign({}, AST_EXPRESSIONS.object, {
-                                "properties": []
-                            })
+                            "test": MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
+                            "consequent": MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
+                            "alternate":  ObjectExpression()
                         })
                     })
                 }),
                 Object.assign({}, AST_STATEMENTS.expression, {
                     "expression": Object.assign({}, AST_EXPRESSIONS.assignment, {
-                        "left": Object.assign({}, AST_EXPRESSIONS.member, {
-                            "object":    Object.assign({}, AST_EXPRESSIONS.member, {
-                                "object":   {"type": "Identifier","name": ____rv4EXPORT____},
-                                "property": {"type": "Identifier","name": "path"},
-                            }),
-                            "property": {"type": "Identifier", "name": "name"},
-                        }),
-                        "right": {"type": "Identifier","name": "value"}
+                        "left": MemberExpression( 
+                            MemberExpression( 
+                                Identifier(____rv4EXPORT____), 
+                                Identifier("path") ),
+                            Identifier("name") 
+                        ),
+                        "right": Identifier("value")
                     })
                 })
             ]
@@ -173,15 +154,17 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             const constAst = Object.assign({}, AST_CONST);
                 constAst.declarations = [];
                 constAst.declarations[0] = Object.assign({}, AST_MISC.variable)
-                constAst.declarations[0].id = {"type": "Identifier", "name": name};
+                constAst.declarations[0].id = Identifier(name);
                 constAst.declarations[0].init = null; // populated below depending on the state of dependency
                 
             //> ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_]
-            const dependencyAst = Object.assign({}, AST_EXPRESSIONS.member);
-                dependencyAst.object =             Object.assign({}, AST_EXPRESSIONS.member);
-                dependencyAst.object.object   =    { "type": "Identifier", "name": ____rv4EXPORT____};
-                dependencyAst.object.property =    { "type": "Literal", "value": relativeFilePath, "raw": `"'${relativeFilePath}'"`}
-                dependencyAst.property =   { "type": "Literal", "value": ____rv4DEFEXPORT_, "raw": `"'${____rv4DEFEXPORT_}'"`}
+            const dependencyAst = MemberExpression(
+                MemberExpression(
+                    Identifier(____rv4EXPORT____),
+                    Literal(relativeFilePath)
+                ),
+                Literal(____rv4DEFEXPORT_)
+            ); 
             //> const `name` = ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_];
             constAst.declarations[0].init = dependencyAst;
             // DEPENDENCY
@@ -191,10 +174,10 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                     "type": "ExpressionStatement",
                     "expression": {
                       "type": "CallExpression",
-                      "callee": {"type": "Identifier","name": ____rv4SET_EXPORT____},
+                      "callee": Identifier(____rv4SET_EXPORT____),
                       "arguments": [
-                        { "type": "Literal", "value": relativeFilePath, "raw": `"'${relativeFilePath}'"`},   // path
-                        { "type": "Literal", "value": ____rv4DEFEXPORT_, "raw": `"'${____rv4DEFEXPORT_}'"`} // depencency name
+                        Literal(relativeFilePath),   // path
+                        Literal(____rv4DEFEXPORT_) // depencency name
                       ]
                     }
                 }
