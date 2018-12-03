@@ -135,15 +135,15 @@ TestPoC();
 async function HandleImportDeclaration(ast, deps, scriptPath) {
     const specifiers = ast.specifiers;
     if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`;
-    const filePath = ast.source.value;
-    const fileName = PATH.basename(filePath);
-    const folderPath = filePath.indexOf('./') === 0 ?
-        PATH.resolve( scriptPath, filePath.replace('./','').substring(0, filePath.replace('./','').lastIndexOf('/')) ) :
-        filePath.substring(0, filePath.lastIndexOf("/"));
+    const impPath = ast.source.value;
+    const impFileName = PATH.basename(impPath);
+    const impFolderPath = impPath.indexOf('./') === 0 ?
+        PATH.resolve( scriptPath, impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/')) ) :
+        impPath.substring(0, impPath.lastIndexOf("/"));
 
-    const relativeFilePath = `${folderPath.replace(ROOT + '/','')}` + filePath.substring( filePath.lastIndexOf('/') );
-    const alreadyResolved = !!deps[relativeFilePath];
-    deps[relativeFilePath] = alreadyResolved ? deps[relativeFilePath] : {};
+    const relImpPath = `${impFolderPath.replace(ROOT + '/','')}` + impPath.substring( impPath.lastIndexOf('/') );
+    const alreadyResolved = !!deps[relImpPath];
+    deps[relImpPath] = alreadyResolved ? deps[relImpPath] : {};
 
     for(let i = 0; i < specifiers.length; i++) {
         const specifier = specifiers[i];
@@ -161,7 +161,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             const dependencyAst = MemberExpression(
                 MemberExpression(
                     Identifier(____rv4EXPORT____),
-                    Literal(relativeFilePath)
+                    Literal(relImpPath)
                 ),
                 Literal(____rv4DEFEXPORT_)
             ); 
@@ -169,48 +169,8 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             constAst.declarations[0].init = dependencyAst;
             // DEPENDENCY
             if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
-                // ____rv4EXPORT____(relativeFilePath, ____rv4DEFEXPORT_, value);
-                const setDependencyFuncCallAst =     {
-                    "type": "ExpressionStatement",
-                    "expression": {
-                      "type": "CallExpression",
-                      "callee": Identifier(____rv4SET_EXPORT____),
-                      "arguments": [
-                        Literal(relativeFilePath),   // path
-                        Literal(____rv4DEFEXPORT_) // depencency name
-                      ]
-                    }
-                }
-
-                const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
-                const moduleAst = ACORN.parse(codeStr, ACORN_OPTIONS);
-
-                for(let i=0; i < moduleAst.body.length; i++ ) { //3
-                    const e = moduleAst.body[i];
-                    if(e.type==='ExportDefaultDeclaration') { // 4
-                        if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
-                            setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration.right);
-                        } else {
-                            setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration);
-                        }
-                        moduleAst.body[i] = setDependencyFuncCallAst;
-                    } else {
-                        moduleAst.body[i] = await Walk(e, deps, folderPath);
-                    }
-                };
-
-                //> ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_] = (function(){moduleBody})()
-                const depInitExprAst = Object.assign({},  AST_EXPRESSIONS.expression);
-                depInitExprAst.expression = {
-                    "type": "CallExpression",
-                    "callee": Object.assign({}, Object.assign({},AST_EXPRESSIONS.function)),
-                    "arguments": []
-                };
-                depInitExprAst.expression.callee.body = Object.assign({},AST_STATEMENTS.block);
-                depInitExprAst.expression.callee.body.body = moduleAst.body;
-                
-                deps[relativeFilePath][____rv4DEFEXPORT_] = depInitExprAst;
-                deps.$order.push({path: relativeFilePath, name : ____rv4DEFEXPORT_});
+                deps[relImpPath][____rv4DEFEXPORT_] = await resolveDependency(relImpPath, ____rv4DEFEXPORT_, deps, impFolderPath, impFileName);
+                deps.$order.push({path: relImpPath, name : ____rv4DEFEXPORT_});
             }
             return Promise.resolve(constAst);
         }; break;
@@ -220,6 +180,50 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     }
     return Promise.reject({error: "Unhandled Import Declaration case!"});
 }
+
+async function resolveDependency(path, name, deps, folderPath, fileName) {
+    // ____rv4EXPORT____(path, name, value);
+    const setDependencyFuncCallAst =     {
+        "type": "ExpressionStatement",
+        "expression": {
+            "type": "CallExpression",
+            "callee": Identifier(____rv4SET_EXPORT____),
+            "arguments": [
+            Literal(path),   // path
+            Literal(name) // depencency name
+            ]
+        }
+    }
+
+    const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
+    const moduleAst = ACORN.parse(codeStr, ACORN_OPTIONS);
+
+    for(let i=0; i < moduleAst.body.length; i++ ) { //3
+        const e = moduleAst.body[i];
+        if(e.type==='ExportDefaultDeclaration') { // 4
+            if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
+                setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration.right);
+            } else {
+                setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration);
+            }
+            moduleAst.body[i] = setDependencyFuncCallAst;
+        } else {
+            moduleAst.body[i] = await Walk(e, deps, folderPath);
+        }
+    };
+
+    //> ____rv4EXPORT____[`scriptPath`][name] = (function(){moduleBody})()
+    const depInitExprAst = Object.assign({},  AST_EXPRESSIONS.expression);
+    depInitExprAst.expression = {
+        "type": "CallExpression",
+        "callee": Object.assign({}, Object.assign({},AST_EXPRESSIONS.function)),
+        "arguments": []
+    };
+    depInitExprAst.expression.callee.body = Object.assign({},AST_STATEMENTS.block);
+    depInitExprAst.expression.callee.body.body = moduleAst.body;
+    
+    return Promise.resolve(depInitExprAst);
+} 
 
 // import App from './app/App.mjs'; 
 //// replace by 
