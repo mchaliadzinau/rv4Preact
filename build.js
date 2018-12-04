@@ -2,13 +2,12 @@ const ACORN = require("acorn");
 const FS = require("fs");
 const PATH = require("path");
 //
-const AST_CONST = require("./ast/ast.const.json");
 const AST_FUNC_NAMED = require("./ast/ast.named-func.json");
 const AST_EXPRESSIONS = require("./ast/ast.expressions.json");
 const AST_STATEMENTS = require("./ast/ast.statements.json");
 const AST_MISC = require("./ast/ast.misc.json");
 
-const {MemberExpression, ObjectExpression, Identifier, Literal} = require("./ast/astUtils.js");
+const {MemberExpression, ObjectExpression, Identifier, Literal, $constant} = require("./ast/astUtils.js");
 
 const ____rv4EXPORT____ = '____rv4EXPORT____';
 const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
@@ -150,13 +149,6 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
         switch(specifier.type) {
         case "ImportDefaultSpecifier": {
             const name = `${specifier.local.name}`;
-            //> const `name` = ...
-            const constAst = Object.assign({}, AST_CONST);
-                constAst.declarations = [];
-                constAst.declarations[0] = Object.assign({}, AST_MISC.variable)
-                constAst.declarations[0].id = Identifier(name);
-                constAst.declarations[0].init = null; // populated below depending on the state of dependency
-                
             //> ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_]
             const dependencyAst = MemberExpression(
                 MemberExpression(
@@ -166,7 +158,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 Literal(____rv4DEFEXPORT_)
             ); 
             //> const `name` = ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_];
-            constAst.declarations[0].init = dependencyAst;
+            const constAst = $constant(Identifier(name), dependencyAst);
             // DEPENDENCY
             if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
                 deps[relImpPath][____rv4DEFEXPORT_] = await resolveDependency(relImpPath, ____rv4DEFEXPORT_, deps, impFolderPath, impFileName);
