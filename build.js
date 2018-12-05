@@ -166,8 +166,28 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             }
             return Promise.resolve(constAst);
         }; break;
-        case "ImportNamespaceSpecifier": 
-        case "ImportSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`;
+        case "ImportSpecifier": {
+            const importedName = `${specifier.imported.name}`;
+            const localName = `${specifier.local.name}`;
+            //> ____rv4EXPORT____[`scriptPath`][importedName]
+            const dependencyAst = MemberExpression(
+                MemberExpression(
+                    Identifier(____rv4EXPORT____),
+                    Literal(relImpPath)
+                ),
+                Literal(importedName)
+            ); 
+            //> const `localName` = ____rv4EXPORT____[`scriptPath`][importedName];
+            const constAst = $constant(Identifier(localName), dependencyAst);
+            // DEPENDENCY
+            if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
+                deps[relImpPath][importedName] = await resolveDependency(relImpPath, importedName, deps, impFolderPath, impFileName);
+                deps.$order.push({path: relImpPath, name : importedName});
+            }
+            return Promise.resolve(constAst);
+
+        }; break;
+        case "ImportNamespaceSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`;
         }
     }
     return Promise.reject({error: "Unhandled Import Declaration case!"});
