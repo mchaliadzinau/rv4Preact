@@ -219,7 +219,16 @@ async function resolveDependency(path, name, deps, folderPath, fileName) {
                 setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration);
             }
             moduleAst.body[i] = setDependencyFuncCallAst;
-        } else {
+        } if(e.type==='ExportNamedDeclaration') { 
+            if(ast.specifiers.length) {
+                const body = [];
+                for(let i = 0; i < ast.specifiers.length; i++) {
+                    const specifier = ast.specifiers[i];
+                    body.push()
+                }
+                moduleAst.body[i] = Object.assign({},AST_STATEMENTS.block, {body});
+            }
+        }else {
             moduleAst.body[i] = await Walk(e, deps, folderPath);
         }
     };
