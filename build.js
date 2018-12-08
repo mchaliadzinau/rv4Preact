@@ -7,7 +7,7 @@ const AST_EXPRESSIONS = require("./ast/ast.expressions.json");
 const AST_STATEMENTS = require("./ast/ast.statements.json");
 const AST_MISC = require("./ast/ast.misc.json");
 
-const {MemberExpression, ObjectExpression, Identifier, Literal, $constant} = require("./ast/astUtils.js");
+const {MemberExpression, ObjectExpression, Identifier, Literal, Property, $constant, $constants} = require("./ast/astUtils.js");
 
 const ____rv4EXPORT____ = '____rv4EXPORT____';
 const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
@@ -140,10 +140,12 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
         PATH.resolve( scriptPath, impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/')) ) :
         impPath.substring(0, impPath.lastIndexOf("/"));
 
-    const relImpPath = `${impFolderPath.replace(ROOT + '/','')}` + impPath.substring( impPath.lastIndexOf('/') );
+    const relImpPath = PATH.join( impFolderPath + impPath.substring( impPath.lastIndexOf('/') ) ).replace(ROOT + '\\','');
     const alreadyResolved = !!deps[relImpPath];
     deps[relImpPath] = alreadyResolved ? deps[relImpPath] : {};
 
+    const constIds = [],
+        constInits = [];
     for(let i = 0; i < specifiers.length; i++) {
         const specifier = specifiers[i];
         switch(specifier.type) {
@@ -157,14 +159,16 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 ),
                 Literal(____rv4DEFEXPORT_)
             ); 
-            //> const `name` = ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_];
-            const constAst = $constant(Identifier(name), dependencyAst);
+            // > const `name` = ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_];
+            // const constAst = $constant(Identifier(name), dependencyAst);
+            constIds.push( Property(Identifier(name), Identifier(name), {shorthand: true}) );
+            constInits.push( Property(Identifier(name), dependencyAst) );
+
             // DEPENDENCY
             if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
                 deps[relImpPath][____rv4DEFEXPORT_] = await resolveDependency(relImpPath, ____rv4DEFEXPORT_, deps, impFolderPath, impFileName);
                 deps.$order.push({path: relImpPath, name : ____rv4DEFEXPORT_});
             }
-            return Promise.resolve(constAst);
         }; break;
         case "ImportSpecifier": {
             const importedName = `${specifier.imported.name}`;
@@ -178,34 +182,42 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 Literal(importedName)
             ); 
             //> const `localName` = ____rv4EXPORT____[`scriptPath`][importedName];
-            const constAst = $constant(Identifier(localName), dependencyAst);
+            // const constAst = $constant(Identifier(localName), dependencyAst);
+            constIds.push( Property(Identifier(localName), Identifier(localName), {shorthand: true}) );
+            constInits.push( Property(Identifier(localName), dependencyAst) );
             // DEPENDENCY
             if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
                 deps[relImpPath][importedName] = await resolveDependency(relImpPath, importedName, deps, impFolderPath, impFileName);
                 deps.$order.push({path: relImpPath, name : importedName});
             }
-            return Promise.resolve(constAst);
-
         }; break;
         case "ImportNamespaceSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`;
         }
     }
-    return Promise.reject({error: "Unhandled Import Declaration case!"});
+    if(constIds.length === constInits.length && constIds.length > 0) {
+        return Promise.resolve( $constants(constIds,constInits) );
+    } else {
+        return Promise.reject({error: "Unhandled Import Declaration case!"});
+    }
 }
 
 async function resolveDependency(path, name, deps, folderPath, fileName) {
     // ____rv4EXPORT____(path, name, value);
-    const setDependencyFuncCallAst =     {
-        "type": "ExpressionStatement",
-        "expression": {
-            "type": "CallExpression",
-            "callee": Identifier(____rv4SET_EXPORT____),
-            "arguments": [
+    const getSetDependencyAst = (_name, _dependency) => {
+        const arguments = [
             Literal(path),   // path
-            Literal(name) // depencency name
-            ]
+            Literal(_name), // depencency name
+            _dependency
+        ];
+        return {
+                "type": "ExpressionStatement",
+                "expression": {
+                    "type": "CallExpression",
+                    "callee": Identifier(____rv4SET_EXPORT____),
+                    "arguments": arguments
+            }
         }
-    }
+    };
 
     const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
     const moduleAst = ACORN.parse(codeStr, ACORN_OPTIONS);
@@ -213,20 +225,23 @@ async function resolveDependency(path, name, deps, folderPath, fileName) {
     for(let i=0; i < moduleAst.body.length; i++ ) { //3
         const e = moduleAst.body[i];
         if(e.type==='ExportDefaultDeclaration') { // 4
+            let dependencyFuncCallAst;
             if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
-                setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration.right);
+                dependencyFuncCallAst = getSetDependencyAst(name, e.declaration.right);
             } else {
-                setDependencyFuncCallAst["expression"]["arguments"].push(e.declaration);
+                dependencyFuncCallAst = getSetDependencyAst(name, e.declaration);
             }
-            moduleAst.body[i] = setDependencyFuncCallAst;
-        } if(e.type==='ExportNamedDeclaration') { 
+            moduleAst.body[i] = dependencyFuncCallAst;
+        } else if(e.type==='ExportNamedDeclaration') { 
             if(ast.specifiers.length) {
                 const body = [];
                 for(let i = 0; i < ast.specifiers.length; i++) {
                     const specifier = ast.specifiers[i];
-                    body.push()
+                    body.push(getSetDependencyAst(specifier.exported.name, specifier.local))
                 }
                 moduleAst.body[i] = Object.assign({},AST_STATEMENTS.block, {body});
+            } else if(ast.declarations !== null) {
+                throw new Error('ExportNamedDeclaration.declarations handling not yet implemented!');
             }
         }else {
             moduleAst.body[i] = await Walk(e, deps, folderPath);

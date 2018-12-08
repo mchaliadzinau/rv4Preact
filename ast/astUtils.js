@@ -6,8 +6,24 @@ function Literal(value, raw) {
 function Identifier(name) {
     return {"type": "Identifier",         name};
 }
-function ObjectExpression(properties=[]) {
+function Property(key,value, params = {}) {
+    return Object.assign({
+        "type": "Property",
+        "method": false,
+        "shorthand": false,
+        "computed": false,
+        "key": key,
+        "kind": "init",
+        "value": value
+    }, params);
+}
+function ObjectExpression(properties) {
+    properties = typeof properties === 'undefined' ? [] : properties;
     return {"type": "ObjectExpression",   properties};
+}
+function ObjectPattern(properties) {
+    properties = typeof properties === 'undefined' ? [] : properties;
+    return {"type": "ObjectPattern", "properties": properties};
 }
 function MemberExpression(object,property,computed = true) {
     return Object.assign({}, AST_EXPRESSIONS.member, {
@@ -22,11 +38,21 @@ function VariableDeclarator(id,init) {
 
 
 module.exports = {
-    Literal, Identifier, ObjectExpression, MemberExpression, VariableDeclarator,
+    Literal, Identifier, Property, ObjectExpression, MemberExpression, VariableDeclarator,
     $constant: (id, init) => ({
         "type": "VariableDeclaration",
         "declarations": [
             VariableDeclarator(id, init)
+        ],
+        "kind": "const"
+    }),
+    $constants: (idProperties, initProperties) => ({
+        "type": "VariableDeclaration",
+        "declarations": [
+            VariableDeclarator(
+                ObjectPattern(idProperties), 
+                ObjectExpression(initProperties)
+            )
         ],
         "kind": "const"
     }),
