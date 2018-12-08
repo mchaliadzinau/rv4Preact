@@ -48,7 +48,9 @@ async function Walk(ast, deps, scriptPath) {
 }
 
 async function TestPoC(){
-    const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
+    // const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
+    const ast = ACORN.parse("import {h} from './src/libs/preact.mjs';", ACORN_OPTIONS);
+
     const deps = {
         '$order': []
     };
@@ -233,10 +235,10 @@ async function resolveDependency(path, name, deps, folderPath, fileName) {
             }
             moduleAst.body[i] = dependencyFuncCallAst;
         } else if(e.type==='ExportNamedDeclaration') { 
-            if(ast.specifiers.length) {
+            if(e.specifiers.length) {
                 const body = [];
-                for(let i = 0; i < ast.specifiers.length; i++) {
-                    const specifier = ast.specifiers[i];
+                for(let i = 0; i < e.specifiers.length; i++) {
+                    const specifier = e.specifiers[i];
                     body.push(getSetDependencyAst(specifier.exported.name, specifier.local))
                 }
                 moduleAst.body[i] = Object.assign({},AST_STATEMENTS.block, {body});
