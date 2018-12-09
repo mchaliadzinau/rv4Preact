@@ -32,6 +32,15 @@ function MemberExpression(object,property,computed = true) {
         computed
     });
 }
+function VariableDeclaration(declarations, kind = 'const') {
+    declarations = typeof declarations === 'undefined' ? [] : declarations;
+    if(!Array.isArray(declarations)) throw new Error('VariableDeclaration expects declarations to be an array.');
+    return {
+        "type": "VariableDeclaration",
+        "declarations": declarations,
+        "kind": kind
+    }
+}
 function VariableDeclarator(id,init) { 
     return {"type": "VariableDeclarator", id,         init};
 }
@@ -39,60 +48,33 @@ function VariableDeclarator(id,init) {
 
 module.exports = {
     Literal, Identifier, Property, ObjectExpression, MemberExpression, VariableDeclarator,
-    $constant: (id, init) => ({
-        "type": "VariableDeclaration",
-        "declarations": [
-            VariableDeclarator(id, init)
-        ],
-        "kind": "const"
-    }),
-    $constants: (idProperties, initProperties) => ({
-        "type": "VariableDeclaration",
-        "declarations": [
-            VariableDeclarator(
-                ObjectPattern(idProperties), 
-                ObjectExpression(initProperties)
-            )
-        ],
-        "kind": "const"
-    }),
+    $constant: (id, init) => VariableDeclaration([VariableDeclarator(id, init)]),
+    $constants: (idProperties, initProperties) => VariableDeclaration([
+        VariableDeclarator(
+            ObjectPattern(idProperties), 
+            ObjectExpression(initProperties)
+        )
+    ]),
     $destructuringAssignmentConst: (identifiers, props) => {
+        const leftProps = identifiers.map(name =>
+            Property(
+                Identifier(name),
+                Identifier(name),
+                {"shorthand": true,}
+            )             
+        );
+        const rightValues = props.map(prop => 
+            Property(
+                Identifier(prop.name),
+                prop.valueAst
+            )    
+        );
 
-        const leftProps = identifiers.map(name => (                    {
-            "type": "Property",
-            "method": false,
-            "shorthand": true,
-            "computed": false,
-            "key":      Identifier(name),
-            "kind": "init",
-            "value":    Identifier(name),
-        }));
-        const rightValues = props.map(prop => ({
-            "type": "Property",
-            "method": false,
-            "shorthand": false,
-            "computed": false,
-            "key":      Identifier(prop.name),
-            "value":    prop.valueAst,
-            "kind": "init"
-        }));
-
-        return {
-            "type": "VariableDeclaration",
-            "declarations": [
-                {
-                    "type": "VariableDeclarator",
-                    "id": {
-                        "type": "ObjectPattern",
-                        "properties": leftProps
-                    },
-                    "init": {
-                        "type": "ObjectExpression",
-                        "properties": rightValues
-                    }
-                }
-            ],
-            "kind": "const"
-        };
+        return VariableDeclaration([
+            VariableDeclarator(
+                ObjectPattern(leftProps),
+                ObjectExpression(rightValues)
+            )
+        ]);
     }
 }
