@@ -1,13 +1,16 @@
 const ACORN = require("acorn");
 const FS = require("fs");
 const PATH = require("path");
-//
-const AST_FUNC_NAMED = require("./ast/ast.named-func.json");
-const AST_EXPRESSIONS = require("./ast/ast.expressions.json");
-const AST_STATEMENTS = require("./ast/ast.statements.json");
-const AST_MISC = require("./ast/ast.misc.json");
 
-const {MemberExpression, ObjectExpression, Identifier, Literal, Property, $constant, $constants} = require("./ast/astUtils.js");
+const {
+    TYPES,
+    Assignment, CallExpression, Conditional,
+    FunctionExpression,FunctionDeclaration,
+    MemberExpression, ObjectExpression, Identifier, Literal, Property, 
+    VariableDeclaration, VariableDeclarator, 
+    Block,Return,Expression,
+    $constants
+} = require("./ast/astUtils.js");
 
 const ____rv4EXPORT____ = '____rv4EXPORT____';
 const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
@@ -57,55 +60,42 @@ async function TestPoC(){
     const processedAst = await Walk(ast,deps,__dirname);
 
     const modules = [];
-    modules.push({ // const ____rv4EXPORT____={}
-        "type": "VariableDeclaration",
-        "declarations": [
-            {
-                "type": "VariableDeclarator",
-                "id": Identifier(____rv4EXPORT____),
-                "init": ObjectExpression()
-            }
-        ],
-        "kind": "const"
-        
-    });
+    modules.push(VariableDeclaration([
+        VariableDeclarator( Identifier(____rv4EXPORT____), ObjectExpression() )
+    ]));
     // "function ____rv4SET_EXPORT____(path,name,value) {
     //    ____rv4EXPORT____[path] = ____rv4EXPORT____[path] ? ____rv4EXPORT____[path] : {};
     //    ____rv4EXPORT____[path][name] = value;
     // }"
-    modules.push(Object.assign({},AST_FUNC_NAMED,{
-        "id": { "type": "Identifier", "name": "____rv4SET_EXPORT____"},
-        "params": [
-            Identifier("path"),
-            Identifier("name"),
-            Identifier("value")
-        ],
-        "body": Object.assign({}, AST_STATEMENTS.block, {
-            "body": [
-                Object.assign({}, AST_STATEMENTS.expression, {
-                    "expression": Object.assign({}, AST_EXPRESSIONS.assignment, {
-                        "left": MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
-                        "right": Object.assign({}, AST_EXPRESSIONS.conditional, {
-                            "test": MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
-                            "consequent": MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
-                            "alternate":  ObjectExpression()
-                        })
-                    })
-                }),
-                Object.assign({}, AST_STATEMENTS.expression, {
-                    "expression": Object.assign({}, AST_EXPRESSIONS.assignment, {
-                        "left": MemberExpression( 
+    modules.push(
+        FunctionDeclaration(
+            Identifier(____rv4SET_EXPORT____),
+            [ Identifier("path"), Identifier("name"), Identifier("value") ],
+            Block([
+                Expression(
+                    Assignment(
+                        MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
+                        Conditional(
+                            MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
+                            MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
+                            ObjectExpression()
+                        )
+                    )
+                ),
+                Expression(
+                    Assignment(
+                        MemberExpression( 
                             MemberExpression( 
                                 Identifier(____rv4EXPORT____), 
                                 Identifier("path") ),
                             Identifier("name") 
                         ),
-                        "right": Identifier("value")
-                    })
-                })
-            ]
-        })
-    }));
+                        Identifier("value")
+                    )
+                )
+            ])
+        )
+    );
     for(dep of deps.$order) {
         modules.push(deps[dep.path][dep.name]);
     }
@@ -151,7 +141,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     for(let i = 0; i < specifiers.length; i++) {
         const specifier = specifiers[i];
         switch(specifier.type) {
-        case "ImportDefaultSpecifier": {
+        case TYPES.IMPORT_DEFAULT_SPECIFIER: {
             const name = `${specifier.local.name}`;
             //> ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_]
             const dependencyAst = MemberExpression(
@@ -172,7 +162,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 deps.$order.push({path: relImpPath, name : ____rv4DEFEXPORT_});
             }
         }; break;
-        case "ImportSpecifier": {
+        case TYPES.IMPORT_SPECIFIER: {
             const importedName = `${specifier.imported.name}`;
             const localName = `${specifier.local.name}`;
             //> ____rv4EXPORT____[`scriptPath`][importedName]
@@ -193,7 +183,8 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 deps.$order.push({path: relImpPath, name : importedName});
             }
         }; break;
-        case "ImportNamespaceSpecifier": throw `${specifier.type} specifier type handler is not implemented <yet>.`;
+        case TYPES.IMPORT_NAMESPACE_SPECIFIER: 
+            throw `${specifier.type} specifier type handler is not implemented <yet>.`;
         }
     }
     if(constIds.length === constInits.length && constIds.length > 0) {
@@ -211,14 +202,12 @@ async function resolveDependency(path, name, deps, folderPath, fileName) {
             Literal(_name), // depencency name
             _dependency
         ];
-        return {
-                "type": "ExpressionStatement",
-                "expression": {
-                    "type": "CallExpression",
-                    "callee": Identifier(____rv4SET_EXPORT____),
-                    "arguments": arguments
-            }
-        }
+        return Expression( 
+            CallExpression(
+                Identifier(____rv4SET_EXPORT____), 
+                arguments
+            ) 
+        );
     };
 
     const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
@@ -226,22 +215,22 @@ async function resolveDependency(path, name, deps, folderPath, fileName) {
 
     for(let i=0; i < moduleAst.body.length; i++ ) { //3
         const e = moduleAst.body[i];
-        if(e.type==='ExportDefaultDeclaration') { // 4
+        if(e.type=== TYPES.EXPORT_DEFAULT_DECLARATION) { // 4
             let dependencyFuncCallAst;
-            if(e.declaration.type === 'AssignmentExpression') { // handle cases like `export default b = 'value'` to avoid creation of global variables
+            if(e.declaration.type === TYPES.ASSIGNMENT_EXPRESSION) { // handle cases like `export default b = 'value'` to avoid creation of global variables
                 dependencyFuncCallAst = getSetDependencyAst(name, e.declaration.right);
             } else {
                 dependencyFuncCallAst = getSetDependencyAst(name, e.declaration);
             }
             moduleAst.body[i] = dependencyFuncCallAst;
-        } else if(e.type==='ExportNamedDeclaration') { 
+        } else if(e.type===TYPES.EXPORT_NAMED_DECLARATION) { 
             if(e.specifiers.length) {
                 const body = [];
                 for(let i = 0; i < e.specifiers.length; i++) {
                     const specifier = e.specifiers[i];
                     body.push(getSetDependencyAst(specifier.exported.name, specifier.local))
                 }
-                moduleAst.body[i] = Object.assign({},AST_STATEMENTS.block, {body});
+                moduleAst.body[i] = Block(body);
             } else if(ast.declarations !== null) {
                 throw new Error('ExportNamedDeclaration.declarations handling not yet implemented!');
             }
@@ -251,15 +240,16 @@ async function resolveDependency(path, name, deps, folderPath, fileName) {
     };
 
     //> ____rv4EXPORT____[`scriptPath`][name] = (function(){moduleBody})()
-    const depInitExprAst = Object.assign({},  AST_EXPRESSIONS.expression);
-    depInitExprAst.expression = {
-        "type": "CallExpression",
-        "callee": Object.assign({}, Object.assign({},AST_EXPRESSIONS.function)),
-        "arguments": []
-    };
-    depInitExprAst.expression.callee.body = Object.assign({},AST_STATEMENTS.block);
-    depInitExprAst.expression.callee.body.body = moduleAst.body;
-    
+    const depInitExprAst = Expression(
+        CallExpression(
+            FunctionExpression(
+                null,
+                [],
+                Block(moduleAst.body)
+            )
+        )
+    );
+
     return Promise.resolve(depInitExprAst);
 } 
 
