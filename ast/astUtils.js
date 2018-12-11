@@ -1,5 +1,3 @@
-const AST_EXPRESSIONS = require("./ast.expressions.json");
-
 const TYPES = {
     LITERAL:                'Literal',
     IDENTIFIER:             'Identifier',
@@ -16,6 +14,7 @@ const TYPES = {
     FUNCTION_DECLARATION:    'FunctionDeclaration',
     CALL_EXPRESSION:         'CallExpression',
     CONDITIONAL_EXPRESSION:  'ConditionalExpression',
+    MEMBER_EXPRESSION:        'MemberExpression',
     // not implemented:
     EXPORT_NAMED_DECLARATION:     'ExportNamedDeclaration',
     EXPORT_DEFAULT_DECLARATION:   'ExportDefaultDeclaration',
@@ -25,91 +24,81 @@ const TYPES = {
 }
 
 function Literal(value, raw) {
-    return {"type": TYPES.LITERAL, value, "raw": (raw ? raw : `"'${value}'"`) };
+    const type = TYPES.LITERAL;
+    const raw = raw ? raw : `"'${value}'"`;
+    return { type, value, raw };
 }
 function Identifier(name) {
-    return {"type": TYPES.IDENTIFIER, name};
+    const type = TYPES.IDENTIFIER;
+    return { type, name };
 }
 function Property(key,value, params = {}) {
+    const type = TYPES.PROPERTY;
     return Object.assign({
-        "type": TYPES.PROPERTY,
+        type,
         "method": false,
         "shorthand": false,
         "computed": false,
-        "key": key,
+        key,
         "kind": "init",
-        "value": value
+        value
     }, params);
 }
 function Block(body) {
-    return {
-        "type": TYPES.BLOCK_STATEMENT,
-        "body": body
-    };
+    const type = TYPES.BLOCK_STATEMENT;
+    return { type, body };
 }
 function Return(argument) {
-    return {
-        "type": TYPES.RETURN_STATEMENT,
-        "argument": argument
-    }
+    const type = TYPES.RETURN_STATEMENT;
+    return { type, argument };
 }
 function Expression(expression){
-    return {
-        "type": TYPES.EXPRESSION_STATEMENT,
-        "expression": expression
-    }
+    const type = TYPES.EXPRESSION_STATEMENT;
+    return { type, expression }
 }
 function ObjectExpression(properties) {
     properties = typeof properties === 'undefined' ? [] : properties;
-    return {"type": TYPES.OBJECT_EXPRESSION,   properties};
+    const type = TYPES.OBJECT_EXPRESSION;
+    return { type, properties };
 }
 function ObjectPattern(properties) {
     properties = typeof properties === 'undefined' ? [] : properties;
-    return {"type": TYPES.OBJECT_PATTERN, "properties": properties};
+    const type = TYPES.OBJECT_PATTERN;
+    return { type, properties };
 }
 function MemberExpression(object,property,computed = true) {
-    return Object.assign({}, AST_EXPRESSIONS.member, {
-        object,
-        property,
-        computed
-    });
+    const type = TYPES.MEMBER_EXPRESSION;
+    return { type, object, property, computed };
 }
 function VariableDeclaration(declarations, kind = 'const') {
     declarations = typeof declarations === 'undefined' ? [] : declarations;
     if(!Array.isArray(declarations)) throw new Error('VariableDeclaration expects declarations to be an array.');
-    return {
-        "type": TYPES.VARIABLE_DECLARATION,
-        "declarations": declarations,
-        "kind": kind
-    }
+    const type = TYPES.VARIABLE_DECLARATION;
+    return { type, declarations, kind }
 }
-function VariableDeclarator(id,init) { 
-    return {"type": TYPES.VARIABLE_DECLARATOR, id,         init};
+function VariableDeclarator(id,init) {
+    const type = TYPES.VARIABLE_DECLARATOR
+    return { type, id, init};
 }
 function Assignment(left, right, operator = '=') {
-    return {
-        "type": TYPES.ASSIGNMENT_EXPRESSION, operator, left, right
-    }
+    const type = TYPES.ASSIGNMENT_EXPRESSION;
+    return { type, operator, left, right };
 }
 function FunctionExpression(id = null, params = [], body = {}, expression = false, generator = false, async = false ) {
-    return {
-        "type": TYPES.FUNCTION_EXPRESSION, id, expression, generator, async, params, body
-    };
+    const type = TYPES.FUNCTION_EXPRESSION
+    return { type, id, expression, generator, async, params, body };
 }
 function FunctionDeclaration(id = null, params = [], body = {}, expression = false, generator = false, async = false ) {
-    return {
-        "type": TYPES.FUNCTION_DECLARATION, id, expression, generator, async, params, body
-    };
+    const type = TYPES.FUNCTION_DECLARATION;
+    return { type, id, expression, generator, async, params, body };
 }
 function CallExpression(callee, arguments = []) {
-    return {
-        "type": TYPES.CALL_EXPRESSION, callee, arguments
-    }
+    const type = TYPES.CALL_EXPRESSION;
+    return { type, callee, arguments };
 }
 function Conditional(test, consequent, alternate) {
-    return {
-        "type": TYPES.CONDITIONAL_EXPRESSION, test, consequent, alternate
-    }
+    const type = TYPES.CONDITIONAL_EXPRESSION;
+    return { type, test, consequent, alternate };
 }
 
 
