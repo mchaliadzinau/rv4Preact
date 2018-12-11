@@ -23,9 +23,9 @@ const TYPES = {
     IMPORT_DEFAULT_SPECIFIER:     'ImportDefaultSpecifier',
 }
 
-function Literal(value, raw) {
+function Literal(value, rawValue) {
     const type = TYPES.LITERAL;
-    const raw = raw ? raw : `"'${value}'"`;
+    const raw = rawValue ? rawValue : `"'${value}'"`;
     return { type, value, raw };
 }
 function Identifier(name) {
