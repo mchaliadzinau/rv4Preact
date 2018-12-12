@@ -14,11 +14,11 @@ const TYPES = {
     FUNCTION_DECLARATION:    'FunctionDeclaration',
     CALL_EXPRESSION:         'CallExpression',
     CONDITIONAL_EXPRESSION:  'ConditionalExpression',
-    MEMBER_EXPRESSION:        'MemberExpression',
+    MEMBER_EXPRESSION:       'MemberExpression',
     // not implemented:
     EXPORT_NAMED_DECLARATION:     'ExportNamedDeclaration',
     EXPORT_DEFAULT_DECLARATION:   'ExportDefaultDeclaration',
-    IMPORT_SPECIFIER:            'ImportSpecifier',
+    IMPORT_SPECIFIER:             'ImportSpecifier',
     IMPORT_NAMESPACE_SPECIFIER:   'ImportNamespaceSpecifier',
     IMPORT_DEFAULT_SPECIFIER:     'ImportDefaultSpecifier',
 }
@@ -32,17 +32,9 @@ function Identifier(name) {
     const type = TYPES.IDENTIFIER;
     return { type, name };
 }
-function Property(key,value, params = {}) {
+function Property(key,value, params = {method: false, shorthand: false, computed: false, kind: 'init'}) {
     const type = TYPES.PROPERTY;
-    return Object.assign({
-        type,
-        "method": false,
-        "shorthand": false,
-        "computed": false,
-        key,
-        "kind": "init",
-        value
-    }, params);
+    return Object.assign({ type, key, value }, params);
 }
 function Block(body) {
     const type = TYPES.BLOCK_STATEMENT;
@@ -56,13 +48,11 @@ function Expression(expression){
     const type = TYPES.EXPRESSION_STATEMENT;
     return { type, expression }
 }
-function ObjectExpression(properties) {
-    properties = typeof properties === 'undefined' ? [] : properties;
+function ObjectExpression(properties = []) {
     const type = TYPES.OBJECT_EXPRESSION;
     return { type, properties };
 }
-function ObjectPattern(properties) {
-    properties = typeof properties === 'undefined' ? [] : properties;
+function ObjectPattern(properties = []) {
     const type = TYPES.OBJECT_PATTERN;
     return { type, properties };
 }
@@ -70,8 +60,7 @@ function MemberExpression(object,property,computed = true) {
     const type = TYPES.MEMBER_EXPRESSION;
     return { type, object, property, computed };
 }
-function VariableDeclaration(declarations, kind = 'const') {
-    declarations = typeof declarations === 'undefined' ? [] : declarations;
+function VariableDeclaration(declarations = [], kind = 'const') {
     if(!Array.isArray(declarations)) throw new Error('VariableDeclaration expects declarations to be an array.');
     const type = TYPES.VARIABLE_DECLARATION;
     return { type, declarations, kind }
