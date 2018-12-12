@@ -152,7 +152,6 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 Literal(____rv4DEFEXPORT_)
             ); 
             // > const `name` = ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_];
-            // const constAst = $constant(Identifier(name), dependencyAst);
             constIds.push( Property(Identifier(name), Identifier(name), {shorthand: true}) );
             constInits.push( Property(Identifier(name), dependencyAst) );
 
@@ -174,7 +173,6 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
                 Literal(importedName)
             ); 
             //> const `localName` = ____rv4EXPORT____[`scriptPath`][importedName];
-            // const constAst = $constant(Identifier(localName), dependencyAst);
             constIds.push( Property(Identifier(localName), Identifier(localName), {shorthand: true}) );
             constInits.push( Property(Identifier(localName), dependencyAst) );
             // DEPENDENCY
@@ -195,7 +193,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
 }
 
 async function resolveDependency(path, name, deps, folderPath, fileName) {
-    // ____rv4EXPORT____(path, name, value);
+    // ____rv4SET_EXPORT____(path, name, value);
     const getSetDependencyAst = (_name, _dependency) => {
         const arguments = [
             Literal(path),   // path
