@@ -51,8 +51,8 @@ async function Walk(ast, deps, scriptPath) {
 }
 
 async function TestPoC(){
-    // const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
-    const ast = ACORN.parse("import {h} from './src/libs/preact.mjs';", ACORN_OPTIONS);
+    const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
+    // const ast = ACORN.parse("import {h} from './src/libs/preact.mjs';", ACORN_OPTIONS);
 
     const deps = {
         '$order': []
@@ -228,9 +228,21 @@ async function resolveDependency(path, name, deps, folderPath, fileName) {
                     const specifier = e.specifiers[i];
                     body.push(getSetDependencyAst(specifier.exported.name, specifier.local))
                 }
-                moduleAst.body[i] = Block(body);
-            } else if(ast.declarations !== null) {
-                throw new Error('ExportNamedDeclaration.declarations handling not yet implemented!');
+                moduleAst.body.splice(i,1, ...body);
+            } else if(e.declaration !== null) {
+                const body = [e.declaration];
+                if(e.declaration.type === TYPES.VARIABLE_DECLARATION) {
+                    const declarations = e.declaration.declarations;
+                    const count = declarations.length;
+                    for(let i = 0; i < count; i++) {
+                        const declaration = declarations[i];
+                        body.push(getSetDependencyAst(declaration.id.name, Identifier(declaration.id.name)))
+                    }
+                } else {
+                    const declaration = e.declaration;
+                    body.push(getSetDependencyAst(declaration.id.name, Identifier(declaration.id.name)))
+                }
+                moduleAst.body.splice(i,1, ...body);
             }
         }else {
             moduleAst.body[i] = await Walk(e, deps, folderPath);
