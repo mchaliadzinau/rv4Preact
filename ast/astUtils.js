@@ -1,3 +1,5 @@
+const AST_EXPRESSIONS = require('./ast.expressions.json')
+
 const TYPES = {
     LITERAL:                'Literal',
     IDENTIFIER:             'Identifier',
@@ -32,9 +34,13 @@ function Identifier(name) {
     const type = TYPES.IDENTIFIER;
     return { type, name };
 }
-function Property(key,value, params = {method: false, shorthand: false, computed: false, kind: 'init'}) {
+function Property(key,value, params = {}) {
     const type = TYPES.PROPERTY;
-    return Object.assign({ type, key, value }, params);
+    const method = params.method ? params.method : false;
+    const shorthand = params.shorthand ? params.shorthand : false;
+    const computed =  params.computed ? params.computed : false;
+    const kind = params.kind ? params.kind : 'init';
+    return Object.assign({},{ type,key,value }, { method, shorthand, computed, kind });
 }
 function Block(body) {
     const type = TYPES.BLOCK_STATEMENT;
