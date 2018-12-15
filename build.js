@@ -138,9 +138,8 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
 
     if(specifiers.length === 0) { // import side effect
         if(!alreadyResolved) {
-            // TO DO 
-            // deps[relImpPath] = await resolveDependency(relImpPath, null, deps, impFolderPath, impFileName);
-            // deps.$order.push({path: relImpPath, name : null});
+            deps[relImpPath] = await resolveDependency(relImpPath, deps, impFolderPath, impFileName);
+            deps.$order.push(relImpPath);
         }
         return Promise.resolve( Empty() );
     }
