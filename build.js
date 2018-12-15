@@ -4,6 +4,7 @@ const PATH = require("path");
 
 const {
     TYPES,
+    Empty,
     Assignment, CallExpression, Conditional,
     FunctionExpression,FunctionDeclaration,
     MemberExpression, ObjectExpression, Identifier, Literal, Property, 
@@ -96,8 +97,8 @@ async function TestPoC(){
             ])
         )
     );
-    for(dep of deps.$order) {
-        modules.push(deps[dep.path][dep.name]);
+    for(relImpPath of deps.$order) {
+        modules.push(deps[relImpPath]);
     }
     processedAst.body = modules.concat(processedAst.body);
 
@@ -134,7 +135,15 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
 
     const relImpPath = PATH.join( impFolderPath + impPath.substring( impPath.lastIndexOf('/') ) ).replace(ROOT + '\\','');
     const alreadyResolved = !!deps[relImpPath];
-    deps[relImpPath] = alreadyResolved ? deps[relImpPath] : {};
+
+    if(specifiers.length === 0) { // import side effect
+        if(!alreadyResolved) {
+            // TO DO 
+            // deps[relImpPath] = await resolveDependency(relImpPath, null, deps, impFolderPath, impFileName);
+            // deps.$order.push({path: relImpPath, name : null});
+        }
+        return Promise.resolve( Empty() );
+    }
 
     const constIds = [],
         constInits = [];
@@ -157,8 +166,8 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
 
             // DEPENDENCY
             if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
-                deps[relImpPath][____rv4DEFEXPORT_] = await resolveDependency(relImpPath, ____rv4DEFEXPORT_, deps, impFolderPath, impFileName);
-                deps.$order.push({path: relImpPath, name : ____rv4DEFEXPORT_});
+                deps[relImpPath] = await resolveDependency(relImpPath, deps, impFolderPath, impFileName);
+                deps.$order.push(relImpPath);
             }
         }; break;
         case TYPES.IMPORT_SPECIFIER: {
@@ -177,22 +186,26 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             constInits.push( Property(Identifier(localName), dependencyAst) );
             // DEPENDENCY
             if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
-                deps[relImpPath][importedName] = await resolveDependency(relImpPath, importedName, deps, impFolderPath, impFileName);
-                deps.$order.push({path: relImpPath, name : importedName});
+                deps[relImpPath] = await resolveDependency(relImpPath, deps, impFolderPath, impFileName);
+                deps.$order.push(relImpPath);
             }
         }; break;
         case TYPES.IMPORT_NAMESPACE_SPECIFIER: 
             throw `${specifier.type} specifier type handler is not implemented <yet>.`;
         }
     }
+
+    // check for errors ///////////////////////////////////////////////////////////////////////////
+    if(!deps[relImpPath]) throw new Error("Dependency was not resolved!"); 
+
     if(constIds.length === constInits.length && constIds.length > 0) {
         return Promise.resolve( $constants(constIds,constInits) );
     } else {
-        return Promise.reject({error: "Unhandled Import Declaration case!"});
+        throw new Error("Unhandled Import Declaration case!");
     }
 }
 
-async function resolveDependency(path, name, deps, folderPath, fileName) {
+async function resolveDependency(path, deps, folderPath, fileName) {
     // ____rv4SET_EXPORT____(path, name, value);
     const getSetDependencyAst = (_name, _dependency) => {
         const arguments = [
@@ -216,9 +229,9 @@ async function resolveDependency(path, name, deps, folderPath, fileName) {
         if(e.type=== TYPES.EXPORT_DEFAULT_DECLARATION) { // 4
             let dependencyFuncCallAst;
             if(e.declaration.type === TYPES.ASSIGNMENT_EXPRESSION) { // handle cases like `export default b = 'value'` to avoid creation of global variables
-                dependencyFuncCallAst = getSetDependencyAst(name, e.declaration.right);
+                dependencyFuncCallAst = getSetDependencyAst(____rv4DEFEXPORT_, e.declaration.right);
             } else {
-                dependencyFuncCallAst = getSetDependencyAst(name, e.declaration);
+                dependencyFuncCallAst = getSetDependencyAst(____rv4DEFEXPORT_, e.declaration);
             }
             moduleAst.body[i] = dependencyFuncCallAst;
         } else if(e.type===TYPES.EXPORT_NAMED_DECLARATION) { 

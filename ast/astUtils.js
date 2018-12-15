@@ -1,9 +1,8 @@
-const AST_EXPRESSIONS = require('./ast.expressions.json')
-
 const TYPES = {
     LITERAL:                'Literal',
     IDENTIFIER:             'Identifier',
     PROPERTY:               'Property',
+    EMPTY_STATEMENT:         'EmptyStatement',
     BLOCK_STATEMENT:         'BlockStatement',
     RETURN_STATEMENT:        'ReturnStatement',
     EXPRESSION_STATEMENT:    'ExpressionStatement',
@@ -24,7 +23,9 @@ const TYPES = {
     IMPORT_NAMESPACE_SPECIFIER:   'ImportNamespaceSpecifier',
     IMPORT_DEFAULT_SPECIFIER:     'ImportDefaultSpecifier',
 }
-
+function Empty() {
+    return { type: TYPES.EMPTY_STATEMENT}
+}
 function Literal(value, rawValue) {
     const type = TYPES.LITERAL;
     const raw = rawValue ? rawValue : `"'${value}'"`;
@@ -99,6 +100,7 @@ function Conditional(test, consequent, alternate) {
 
 module.exports = {
     TYPES,
+    Empty,
     Literal, Identifier, Property, ObjectExpression, MemberExpression, 
     VariableDeclaration, VariableDeclarator,
     Block,Return,Expression,
