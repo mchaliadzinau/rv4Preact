@@ -18,9 +18,8 @@ const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
 const ____rv4SET_EXPORT____ = '____rv4SET_EXPORT____';
 
 const SCRIPT = './src/index.js';
-const ROOT = __dirname;
+const SRC = 'src';
 const ACORN_OPTIONS = {
-    ecmaVersion: 7,
     sourceType: 'module'
 };
 
@@ -52,8 +51,9 @@ async function Walk(ast, deps, scriptPath) {
 }
 
 async function TestPoC(){
-    const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
+    // const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
     // const ast = ACORN.parse("import {h} from './src/libs/preact.mjs';", ACORN_OPTIONS);
+    const ast = ACORN.parse(await ReadFile('src/index.js'), ACORN_OPTIONS);
 
     const deps = {
         '$order': []
@@ -129,11 +129,18 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`;
     const impPath = ast.source.value;
     const impFileName = PATH.basename(impPath);
-    const impFolderPath = impPath.indexOf('./') === 0 ?
-        PATH.resolve( scriptPath, impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/')) ) :
-        impPath.substring(0, impPath.lastIndexOf("/"));
+    const impFolderPath = impPath.indexOf('./') === 0 
+        ? PATH.resolve( 
+            scriptPath.indexOf( PATH.join(__dirname, SRC) ) == 0 ?  scriptPath : PATH.join(__dirname, SRC), 
+            impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/')) 
+        )
+        :(
+            impPath.indexOf('/') === 0 
+            ? PATH.join( SRC, impPath.substring(0, impPath.lastIndexOf("/")))
+            : impPath.substring(0, impPath.lastIndexOf("/"))
+        );
 
-    const relImpPath = PATH.join( impFolderPath + impPath.substring( impPath.lastIndexOf('/') ) ).replace(ROOT + '\\','');
+    const relImpPath = PATH.join( impFolderPath + impPath.substring( impPath.lastIndexOf('/') ) ).replace(__dirname + '\\','');
     const alreadyResolved = !!deps[relImpPath];
 
     if(specifiers.length === 0) { // import side effect
