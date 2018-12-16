@@ -1,4 +1,5 @@
 const ACORN = require("acorn");
+const { generate } = require('astring');
 const FS = require("fs");
 const PATH = require("path");
 
@@ -13,15 +14,27 @@ const {
     $constants
 } = require("./ast/astUtils.js");
 
+const ARGS = process.argv.slice(2);
+const SOURCE = ARGS[0],
+        OUTPUT = ARGS[1];
+const SRC = SOURCE ? SOURCE.substring(0,SOURCE.lastIndexOf('/')).replace('./','') : 'tests/bundler' ;
+
 const ____rv4EXPORT____ = '____rv4EXPORT____';
 const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
 const ____rv4SET_EXPORT____ = '____rv4SET_EXPORT____';
 
 const SCRIPT = './src/index.js';
-const SRC = 'src';
 const ACORN_OPTIONS = {
     sourceType: 'module'
 };
+
+if(SOURCE) {
+    TestPoC(SOURCE);
+} else {
+    const src = './tests/bundler/export_default_afunc.js';
+    // const src ='./src/libs/preact.mjs';
+    TestPoC(src);
+}
 
 function PrettyPrint(json) {
     console.log( JSON.stringify(json, null, 2) );
@@ -50,10 +63,8 @@ async function Walk(ast, deps, scriptPath) {
     return Promise.resolve(ast);
 }
 
-async function TestPoC(){
-    // const ast = ACORN.parse("import A from './tests/bundler/export_default_afunc.js';", ACORN_OPTIONS);
-    // const ast = ACORN.parse("import {h} from './src/libs/preact.mjs';", ACORN_OPTIONS);
-    const ast = ACORN.parse(await ReadFile('src/index.js'), ACORN_OPTIONS);
+async function TestPoC(source){
+    const ast = ACORN.parse(await ReadFile(source), ACORN_OPTIONS);
 
     const deps = {
         '$order': []
@@ -102,9 +113,12 @@ async function TestPoC(){
     }
     processedAst.body = modules.concat(processedAst.body);
 
-    PrettyPrint(processedAst);
+    if(OUTPUT) {
+        console.log(generate(processedAst)); // TO DO
+    } else {
+        PrettyPrint(processedAst);
+    }
 }
-TestPoC();
 
 /**
  * ImportDeclaration
