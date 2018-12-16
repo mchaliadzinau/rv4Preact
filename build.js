@@ -16,14 +16,13 @@ const {
 
 const ARGS = process.argv.slice(2);
 const SOURCE = ARGS[0],
-        OUTPUT = ARGS[1];
-const SRC = SOURCE ? SOURCE.substring(0,SOURCE.lastIndexOf('/')).replace('./','') : 'tests/bundler' ;
+        OUTPUT = ARGS[1],
+        SOURCE_DIR = SOURCE ? SOURCE.substring(0,SOURCE.lastIndexOf('/')).replace('./','') : 'tests/bundler' ;
 
 const ____rv4EXPORT____ = '____rv4EXPORT____';
 const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
 const ____rv4SET_EXPORT____ = '____rv4SET_EXPORT____';
 
-const SCRIPT = './src/index.js';
 const ACORN_OPTIONS = {
     sourceType: 'module'
 };
@@ -39,12 +38,6 @@ if(SOURCE) {
 function PrettyPrint(json) {
     console.log( JSON.stringify(json, null, 2) );
 }
-
-FS.readFile(SCRIPT, (err, data) => {
-    if (err) throw err;
-    const ast = ACORN.parse(data, ACORN_OPTIONS);
-    // PrettyPrint(ast);
-});
 
 /**
  * 1) Went through nodes
@@ -145,12 +138,12 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     const impFileName = PATH.basename(impPath);
     const impFolderPath = impPath.indexOf('./') === 0 
         ? PATH.resolve( 
-            scriptPath.indexOf( PATH.join(__dirname, SRC) ) == 0 ?  scriptPath : PATH.join(__dirname, SRC), 
+            scriptPath.indexOf( PATH.join(__dirname, SOURCE_DIR) ) == 0 ?  scriptPath : PATH.join(__dirname, SOURCE_DIR), 
             impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/')) 
         )
         :(
             impPath.indexOf('/') === 0 
-            ? PATH.join( SRC, impPath.substring(0, impPath.lastIndexOf("/")))
+            ? PATH.join( SOURCE_DIR, impPath.substring(0, impPath.lastIndexOf("/")))
             : impPath.substring(0, impPath.lastIndexOf("/"))
         );
 
