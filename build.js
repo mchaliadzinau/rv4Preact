@@ -141,10 +141,9 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
         );
 
     const relImpPath = PATH.join( impFolderPath + impPath.substring( impPath.lastIndexOf('/') ) ).replace(__dirname + '\\','');
-    const alreadyResolved = !!deps[relImpPath];
 
     if(specifiers.length === 0) { // import side effect
-        if(!alreadyResolved) {
+        if(checkIsNotResolved(deps,relImpPath)) {
             deps[relImpPath] = await resolveDependency(relImpPath, deps, impFolderPath, impFileName);
             deps.$order.push(relImpPath);
         }
@@ -171,7 +170,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             constInits.push( Property(Identifier(name), dependencyAst) );
 
             // DEPENDENCY
-            if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
+            if(checkIsNotResolved(deps, relImpPath)) {                                                    // IS NOT RESOLVED                                                           
                 deps[relImpPath] = await resolveDependency(relImpPath, deps, impFolderPath, impFileName);
                 deps.$order.push(relImpPath);
             }
@@ -191,7 +190,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
             constIds.push( Property(Identifier(localName), Identifier(localName), {shorthand: true}) );
             constInits.push( Property(Identifier(localName), dependencyAst) );
             // DEPENDENCY
-            if(!alreadyResolved) {                                                    // IS NOT RESOLVED                                                           
+            if(checkIsNotResolved(deps, relImpPath)) {                                                    // IS NOT RESOLVED                                                           
                 deps[relImpPath] = await resolveDependency(relImpPath, deps, impFolderPath, impFileName);
                 deps.$order.push(relImpPath);
             }
@@ -209,6 +208,10 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     } else {
         throw new Error("Unhandled Import Declaration case!");
     }
+}
+
+function checkIsNotResolved(deps,relImpPath) {
+    return !deps[relImpPath];
 }
 
 async function resolveDependency(path, deps, folderPath, fileName) {
