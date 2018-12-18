@@ -10,7 +10,7 @@
             "name": "Launch Program",
             "program": "${workspaceFolder}\\build.js",
             "args": [
-                "src/index.js"
+                "tests/bundler/export_default_afunc.js"
             ]
         }
     ]
