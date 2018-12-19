@@ -143,8 +143,7 @@ function HandleImportDeclaration(ast, deps, scriptPath) {
 
     if(specifiers.length === 0) { // import side effect
         if(checkIfNotResolved(deps, depName)) {
-            deps[depName] = resolveDependency(depName, deps, impFolderPath, impFileName);
-            deps.$order.push(depName);
+            resolveDependency(depName, deps, impFolderPath, impFileName);
         }
         return Empty();
     }
@@ -195,8 +194,7 @@ function handleDependencyReference(depName, exportedName, importedName, deps, im
 
     // DEPENDENCY
     if(checkIfNotResolved(deps, depName)) {                                                    // IS NOT RESOLVED                                                           
-        deps[depName] = resolveDependency(depName, deps, impFolderPath, impFileName);
-        deps.$order.push(depName);
+        resolveDependency(depName, deps, impFolderPath, impFileName);
     }
 
     return {//> const `importedName` = ____rv4EXPORT____[`depName`][exportedName];
@@ -206,21 +204,6 @@ function handleDependencyReference(depName, exportedName, importedName, deps, im
 }
 
 function resolveDependency(depRef, deps, folderPath, fileName) {
-    // ____rv4SET_EXPORT____(depRef, name, value);
-    const getSetDependencyAst = (_name, _dependency) => {
-        const arguments = [
-            Literal(depRef),   // dependency reference
-            Literal(_name), // depencency name
-            _dependency
-        ];
-        return Expression( 
-            CallExpression(
-                Identifier(____rv4SET_EXPORT____), 
-                arguments
-            ) 
-        );
-    };
-
     const codeStr = FS.readFileSync(PATH.resolve( folderPath, fileName ));
     const moduleAst = ACORN.parse(codeStr, ACORN_OPTIONS);
 
@@ -228,19 +211,19 @@ function resolveDependency(depRef, deps, folderPath, fileName) {
         const e = moduleAst.body[i];
         switch (e.type) {
             case TYPES.EXPORT_DEFAULT_DECLARATION:
-                moduleAst.body[i] = getSetDependencyAst(____rv4DEFEXPORT_, getDefaultExportDeclaration(e)); break;
+                moduleAst.body[i] = createSetDependencyAst(depRef, ____rv4DEFEXPORT_, getDefaultExportDeclaration(e)); break;
             case TYPES.EXPORT_NAMED_DECLARATION: {
                 if(e.specifiers.length) {
-                    const setDependencyAsts = e.specifiers.map(s => getSetDependencyAst(s.exported.name, s.local) );
+                    const setDependencyAsts = e.specifiers.map(s => createSetDependencyAst(depRef, s.exported.name, s.local) );
                     moduleAst.body.splice(i,1, ...setDependencyAsts);
                 } else if(e.declaration !== null) {
                     const body = [e.declaration];
                     if(e.declaration.type === TYPES.VARIABLE_DECLARATION) {
                         const declarations = e.declaration.declarations;
-                        body.push(...declarations.map( d=>getSetDependencyAst(d.id.name, Identifier(d.id.name)) ))
+                        body.push(...declarations.map( d=>createSetDependencyAst(depRef, d.id.name, Identifier(d.id.name)) ))
                     } else {
                         const declaration = e.declaration;
-                        body.push(getSetDependencyAst(declaration.id.name, Identifier(declaration.id.name)))
+                        body.push(createSetDependencyAst(depRef, declaration.id.name, Identifier(declaration.id.name)))
                     }
                     moduleAst.body.splice(i,1, ...body);
                 }
@@ -249,18 +232,13 @@ function resolveDependency(depRef, deps, folderPath, fileName) {
         }
     };
 
-    //> ____rv4EXPORT____[`depRef`][name] = (function(){moduleBody})()
-    const depInitExprAst = Expression(
+    //> MODULES[`depRef`][name] = (function(){moduleBody})()
+    deps[depRef] = Expression( 
         CallExpression(
-            FunctionExpression(
-                null,
-                [],
-                Block(moduleAst.body)
-            )
+            FunctionExpression(null, [], Block(moduleAst.body))
         )
     );
-
-    return depInitExprAst;
+    deps.$order.push(depRef);
 } 
 
 // import App from './app/App.mjs'; 
@@ -293,3 +271,17 @@ function getFullImportPath(scriptPath, impPath) {
             : impPath.substring(0, impPath.lastIndexOf("/"))
         );
 }
+
+function createSetDependencyAst(depRef, name, dependency) {  // ____rv4SET_EXPORT____(depRef, name, value);
+    const arguments = [
+        Literal(depRef),   // dependency reference
+        Literal(name), // depencency name
+        dependency
+    ];
+    return Expression( 
+        CallExpression(
+            Identifier(____rv4SET_EXPORT____), 
+            arguments
+        ) 
+    );
+};
