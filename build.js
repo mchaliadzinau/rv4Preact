@@ -136,16 +136,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`;
     const impPath = ast.source.value;
     const impFileName = PATH.basename(impPath);
-    const impFolderPath = impPath.indexOf('./') === 0 
-        ? PATH.resolve( 
-            scriptPath.indexOf( PATH.join(__dirname, SOURCE_DIR) ) == 0 ?  scriptPath : PATH.join(__dirname, SOURCE_DIR), 
-            impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/')) 
-        )
-        :(
-            impPath.indexOf('/') === 0 
-            ? PATH.join( SOURCE_DIR, impPath.substring(0, impPath.lastIndexOf("/")))
-            : impPath.substring(0, impPath.lastIndexOf("/"))
-        );
+    const impFolderPath = getFullImportPath(scriptPath, impPath);
 
     const relImpPath = PATH.join( impFolderPath + impPath.substring( impPath.lastIndexOf('/') ) ).replace(__dirname + '\\','');
     const depName = makeDepName(relImpPath);
@@ -164,44 +155,14 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
         const specifier = specifiers[i];
         switch(specifier.type) {
         case TYPES.IMPORT_DEFAULT_SPECIFIER: {
-            const name = `${specifier.local.name}`;
-            //> ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_]
-            const dependencyAst = MemberExpression(
-                MemberExpression(
-                    Identifier(____rv4EXPORT____),
-                    Literal(depName)
-                ),
-                Literal(____rv4DEFEXPORT_)
-            ); 
-            // > const `name` = ____rv4EXPORT____[`scriptPath`][____rv4DEFEXPORT_];
-            constIds.push( Property(Identifier(name), Identifier(name), {shorthand: true}) );
-            constInits.push( Property(Identifier(name), dependencyAst) );
-
-            // DEPENDENCY
-            if(checkIfNotResolved(deps, depName)) {                                                    // IS NOT RESOLVED                                                           
-                deps[depName] = await resolveDependency(depName, deps, impFolderPath, impFileName);
-                deps.$order.push(depName);
-            }
+            const refAsts = await handleDependencyReference(depName, ____rv4DEFEXPORT_, specifier.local.name, deps, impFolderPath, impFileName);
+            constIds.push(refAsts.id);
+            constInits.push(refAsts.init);
         }; break;
         case TYPES.IMPORT_SPECIFIER: {
-            const importedName = `${specifier.imported.name}`;
-            const localName = `${specifier.local.name}`;
-            //> ____rv4EXPORT____[`scriptPath`][importedName]
-            const dependencyAst = MemberExpression(
-                MemberExpression(
-                    Identifier(____rv4EXPORT____),
-                    Literal(depName)
-                ),
-                Literal(importedName)
-            ); 
-            //> const `localName` = ____rv4EXPORT____[`scriptPath`][importedName];
-            constIds.push( Property(Identifier(localName), Identifier(localName), {shorthand: true}) );
-            constInits.push( Property(Identifier(localName), dependencyAst) );
-            // DEPENDENCY
-            if(checkIfNotResolved(deps, depName)) {                                                    // IS NOT RESOLVED                                                           
-                deps[depName] = await resolveDependency(depName, deps, impFolderPath, impFileName);
-                deps.$order.push(depName);
-            }
+            const refAsts = await handleDependencyReference(depName, specifier.imported.name, specifier.local.name, deps, impFolderPath, impFileName);
+            constIds.push(refAsts.id);
+            constInits.push(refAsts.init);
         }; break;
         case TYPES.IMPORT_NAMESPACE_SPECIFIER: 
             throw `${specifier.type} specifier type handler is not implemented <yet>.`;
@@ -222,11 +183,33 @@ function checkIfNotResolved(deps,name) {
     return !deps[name];
 }
 
-async function resolveDependency(path, deps, folderPath, fileName) {
-    // ____rv4SET_EXPORT____(path, name, value);
+async function handleDependencyReference(depName, exportedName, importedName, deps, impFolderPath, impFileName) {
+    //> ____rv4EXPORT____[`depName`][exportedName]
+    const dependencyAst = MemberExpression(
+        MemberExpression(
+            Identifier(____rv4EXPORT____),
+            Literal(depName)
+        ),
+        Literal(exportedName)
+    ); 
+
+    // DEPENDENCY
+    if(checkIfNotResolved(deps, depName)) {                                                    // IS NOT RESOLVED                                                           
+        deps[depName] = await resolveDependency(depName, deps, impFolderPath, impFileName);
+        deps.$order.push(depName);
+    }
+
+    return Promise.resolve({//> const `importedName` = ____rv4EXPORT____[`depName`][exportedName];
+        id: Property(Identifier(importedName), Identifier(importedName), {shorthand: true}),
+        init: Property(Identifier(importedName), dependencyAst)
+    });
+}
+
+async function resolveDependency(depRef, deps, folderPath, fileName) {
+    // ____rv4SET_EXPORT____(depRef, name, value);
     const getSetDependencyAst = (_name, _dependency) => {
         const arguments = [
-            Literal(path),   // path
+            Literal(depRef),   // dependency reference
             Literal(_name), // depencency name
             _dependency
         ];
@@ -243,43 +226,30 @@ async function resolveDependency(path, deps, folderPath, fileName) {
 
     for(let i=0; i < moduleAst.body.length; i++ ) { //3
         const e = moduleAst.body[i];
-        if(e.type=== TYPES.EXPORT_DEFAULT_DECLARATION) { // 4
-            let dependencyFuncCallAst;
-            if(e.declaration.type === TYPES.ASSIGNMENT_EXPRESSION) { // handle cases like `export default b = 'value'` to avoid creation of global variables
-                dependencyFuncCallAst = getSetDependencyAst(____rv4DEFEXPORT_, e.declaration.right);
-            } else {
-                dependencyFuncCallAst = getSetDependencyAst(____rv4DEFEXPORT_, e.declaration);
-            }
-            moduleAst.body[i] = dependencyFuncCallAst;
-        } else if(e.type===TYPES.EXPORT_NAMED_DECLARATION) { 
-            if(e.specifiers.length) {
-                const body = [];
-                for(let i = 0; i < e.specifiers.length; i++) {
-                    const specifier = e.specifiers[i];
-                    body.push(getSetDependencyAst(specifier.exported.name, specifier.local))
-                }
-                moduleAst.body.splice(i,1, ...body);
-            } else if(e.declaration !== null) {
-                const body = [e.declaration];
-                if(e.declaration.type === TYPES.VARIABLE_DECLARATION) {
-                    const declarations = e.declaration.declarations;
-                    const count = declarations.length;
-                    for(let i = 0; i < count; i++) {
-                        const declaration = declarations[i];
+        switch (e.type) {
+            case TYPES.EXPORT_DEFAULT_DECLARATION:
+                moduleAst.body[i] = getSetDependencyAst(____rv4DEFEXPORT_, getDefaultExportDeclaration(e)); break;
+            case TYPES.EXPORT_NAMED_DECLARATION: {
+                if(e.specifiers.length) {
+                    const setDependencyAsts = e.specifiers.map(s => getSetDependencyAst(s.exported.name, s.local) );
+                    moduleAst.body.splice(i,1, ...setDependencyAsts);
+                } else if(e.declaration !== null) {
+                    const body = [e.declaration];
+                    if(e.declaration.type === TYPES.VARIABLE_DECLARATION) {
+                        const declarations = e.declaration.declarations;
+                        body.push(...declarations.map( d=>getSetDependencyAst(d.id.name, Identifier(d.id.name)) ))
+                    } else {
+                        const declaration = e.declaration;
                         body.push(getSetDependencyAst(declaration.id.name, Identifier(declaration.id.name)))
                     }
-                } else {
-                    const declaration = e.declaration;
-                    body.push(getSetDependencyAst(declaration.id.name, Identifier(declaration.id.name)))
+                    moduleAst.body.splice(i,1, ...body);
                 }
-                moduleAst.body.splice(i,1, ...body);
-            }
-        }else {
-            moduleAst.body[i] = await Walk(e, deps, folderPath);
+            }; break;
+            default: moduleAst.body[i] = await Walk(e, deps, folderPath);
         }
     };
 
-    //> ____rv4EXPORT____[`scriptPath`][name] = (function(){moduleBody})()
+    //> ____rv4EXPORT____[`depRef`][name] = (function(){moduleBody})()
     const depInitExprAst = Expression(
         CallExpression(
             FunctionExpression(
@@ -315,4 +285,21 @@ function ReadFile(path) {
 
 function makeDepName(relImpPath) {
     return relImpPath.replace(/\\/g,'#');
+}
+
+function getDefaultExportDeclaration(e) { // handle cases like `export default b = 'value'` to avoid creation of global variables
+    return (e.declaration.type === TYPES.ASSIGNMENT_EXPRESSION) ? e.declaration.right : e.declaration;
+}
+
+function getFullImportPath(scriptPath, impPath) {
+    return impPath.indexOf('./') === 0 
+        ? PATH.resolve( 
+            scriptPath.indexOf( PATH.join(__dirname, SOURCE_DIR) ) == 0 ?  scriptPath : PATH.join(__dirname, SOURCE_DIR), 
+            impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/')) 
+        )
+        :(
+            impPath.indexOf('/') === 0 
+            ? PATH.join( SOURCE_DIR, impPath.substring(0, impPath.lastIndexOf("/")))
+            : impPath.substring(0, impPath.lastIndexOf("/"))
+        );
 }
