@@ -42,27 +42,27 @@ function PrettyPrint(json) {
 /**
  * 1) Went through nodes
  */
-async function Walk(ast, deps, scriptPath) {
+function Walk(ast, deps, scriptPath) {
     switch(ast.type) {
         case "Program": for(let i = 0; i < ast.body.length; i++) {
-            const dep2const = await Walk(ast.body[i], deps, scriptPath);
+            const dep2const = Walk(ast.body[i], deps, scriptPath);
             ast.body[i] = dep2const;
         }; break;
         // import
         case "ImportDeclaration": 
-            return await HandleImportDeclaration(ast, deps, scriptPath) ;
+            return HandleImportDeclaration(ast, deps, scriptPath) ;
     }
     // console.log('Walk complete!');
-    return Promise.resolve(ast);
+    return ast;
 }
 
-async function TestPoC(source){
-    const ast = ACORN.parse(await ReadFile(source), ACORN_OPTIONS);
+function TestPoC(source){
+    const ast = ACORN.parse(FS.readFileSync(source), ACORN_OPTIONS);
 
     const deps = {
         '$order': []
     };
-    const processedAst = await Walk(ast,deps,__dirname);
+    const processedAst = Walk(ast,deps,__dirname);
 
     const modules = [];
     modules.push(VariableDeclaration([
@@ -131,7 +131,7 @@ async function TestPoC(source){
  *   .imported.name: String
   @param {} ast 
  */
-async function HandleImportDeclaration(ast, deps, scriptPath) {
+function HandleImportDeclaration(ast, deps, scriptPath) {
     const specifiers = ast.specifiers;
     if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`;
     const impPath = ast.source.value;
@@ -143,10 +143,10 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
 
     if(specifiers.length === 0) { // import side effect
         if(checkIfNotResolved(deps, depName)) {
-            deps[depName] = await resolveDependency(depName, deps, impFolderPath, impFileName);
+            deps[depName] = resolveDependency(depName, deps, impFolderPath, impFileName);
             deps.$order.push(depName);
         }
-        return Promise.resolve( Empty() );
+        return Empty();
     }
 
     const constIds = [],
@@ -155,12 +155,12 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
         const specifier = specifiers[i];
         switch(specifier.type) {
         case TYPES.IMPORT_DEFAULT_SPECIFIER: {
-            const refAsts = await handleDependencyReference(depName, ____rv4DEFEXPORT_, specifier.local.name, deps, impFolderPath, impFileName);
+            const refAsts = handleDependencyReference(depName, ____rv4DEFEXPORT_, specifier.local.name, deps, impFolderPath, impFileName);
             constIds.push(refAsts.id);
             constInits.push(refAsts.init);
         }; break;
         case TYPES.IMPORT_SPECIFIER: {
-            const refAsts = await handleDependencyReference(depName, specifier.imported.name, specifier.local.name, deps, impFolderPath, impFileName);
+            const refAsts = handleDependencyReference(depName, specifier.imported.name, specifier.local.name, deps, impFolderPath, impFileName);
             constIds.push(refAsts.id);
             constInits.push(refAsts.init);
         }; break;
@@ -173,7 +173,7 @@ async function HandleImportDeclaration(ast, deps, scriptPath) {
     if(!deps[depName]) throw new Error("Dependency was not resolved!"); 
 
     if(constIds.length === constInits.length && constIds.length > 0) {
-        return Promise.resolve( $constants(constIds,constInits) );
+        return $constants(constIds,constInits);
     } else {
         throw new Error("Unhandled Import Declaration case!");
     }
@@ -183,7 +183,7 @@ function checkIfNotResolved(deps,name) {
     return !deps[name];
 }
 
-async function handleDependencyReference(depName, exportedName, importedName, deps, impFolderPath, impFileName) {
+function handleDependencyReference(depName, exportedName, importedName, deps, impFolderPath, impFileName) {
     //> ____rv4EXPORT____[`depName`][exportedName]
     const dependencyAst = MemberExpression(
         MemberExpression(
@@ -195,17 +195,17 @@ async function handleDependencyReference(depName, exportedName, importedName, de
 
     // DEPENDENCY
     if(checkIfNotResolved(deps, depName)) {                                                    // IS NOT RESOLVED                                                           
-        deps[depName] = await resolveDependency(depName, deps, impFolderPath, impFileName);
+        deps[depName] = resolveDependency(depName, deps, impFolderPath, impFileName);
         deps.$order.push(depName);
     }
 
-    return Promise.resolve({//> const `importedName` = ____rv4EXPORT____[`depName`][exportedName];
+    return {//> const `importedName` = ____rv4EXPORT____[`depName`][exportedName];
         id: Property(Identifier(importedName), Identifier(importedName), {shorthand: true}),
         init: Property(Identifier(importedName), dependencyAst)
-    });
+    };
 }
 
-async function resolveDependency(depRef, deps, folderPath, fileName) {
+function resolveDependency(depRef, deps, folderPath, fileName) {
     // ____rv4SET_EXPORT____(depRef, name, value);
     const getSetDependencyAst = (_name, _dependency) => {
         const arguments = [
@@ -221,7 +221,7 @@ async function resolveDependency(depRef, deps, folderPath, fileName) {
         );
     };
 
-    const codeStr = await ReadFile(PATH.resolve( folderPath, fileName ));
+    const codeStr = FS.readFileSync(PATH.resolve( folderPath, fileName ));
     const moduleAst = ACORN.parse(codeStr, ACORN_OPTIONS);
 
     for(let i=0; i < moduleAst.body.length; i++ ) { //3
@@ -245,7 +245,7 @@ async function resolveDependency(depRef, deps, folderPath, fileName) {
                     moduleAst.body.splice(i,1, ...body);
                 }
             }; break;
-            default: moduleAst.body[i] = await Walk(e, deps, folderPath);
+            default: moduleAst.body[i] = Walk(e, deps, folderPath);
         }
     };
 
@@ -260,7 +260,7 @@ async function resolveDependency(depRef, deps, folderPath, fileName) {
         )
     );
 
-    return Promise.resolve(depInitExprAst);
+    return depInitExprAst;
 } 
 
 // import App from './app/App.mjs'; 
@@ -272,16 +272,6 @@ async function resolveDependency(depRef, deps, folderPath, fileName) {
 // 3) find ExportDefaultDeclaration and get its "declaration"
 // 4) replace ExportDefaultDeclaration with "ReturnStatement" "argument" of which contains saved ExportDefaultDeclaration."declaration"
 // 5) place everything into FunctionDeclaration."body" and assign to dependencies['__app_App_mjs|App']
-
-function ReadFile(path) {
-    return new Promise((resolve,reject) => {
-        // console.log(path);
-        FS.readFile(path, (err, data) => {
-            if (err) throw reject(err);
-            resolve(data);
-        });
-    }) ;
-}
 
 function makeDepName(relImpPath) {
     return relImpPath.replace(/\\/g,'#');
