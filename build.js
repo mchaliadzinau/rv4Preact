@@ -260,11 +260,11 @@ function getDefaultExportDeclaration(e) { // handle cases like `export default b
 }
 
 function getFullImportDir(consumerDir, impPath, absSrcDir) {
-    if(impPath.indexOf('./') === 0) {
-        const relPathSegment = impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/'));
-        return PATH.resolve(consumerDir, relPathSegment)
+    const dirPath = PATH.dirname(impPath);
+    if(impPath.indexOf('.') === 0) {
+        return PATH.resolve(consumerDir, dirPath);
     } else if(impPath.indexOf('/') === 0) {
-        return PATH.join( absSrcDir, impPath.substring(0, impPath.lastIndexOf("/")))
+        return PATH.join( absSrcDir, dirPath);
     } else {
         throw new Error('Incorrect import path: ' + impPath);
     }
