@@ -16,8 +16,7 @@ const {
 
 const ARGS = process.argv.slice(2);
 const SOURCE = ARGS[0],
-        OUTPUT = ARGS[1],
-        SOURCE_DIR = SOURCE ? SOURCE.substring(0,SOURCE.lastIndexOf('/')).replace('./','') : 'tests/bundler' ;
+        OUTPUT = ARGS[1];
 
 const ____rv4EXPORT____ = '____rv4EXPORT____';
 const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
@@ -27,12 +26,16 @@ const ACORN_OPTIONS = {
     sourceType: 'module'
 };
 
-if(SOURCE) {
-    TestPoC(SOURCE);
+if(SOURCE && OUTPUT) {
+    const bundledAst = Bundle(SOURCE);
+    if(OUTPUT) {
+        console.log(generate(bundledAst)); // TO DO
+    } else {
+        PrettyPrint(bundledAst);
+    }
+
 } else {
-    const src = './tests/bundler/export_default_afunc.js';
-    // const src ='./src/libs/preact.mjs';
-    TestPoC(src);
+    console.error('SOURCE and OUTPUT are not specidied.');
 }
 
 function PrettyPrint(json) {
@@ -56,13 +59,14 @@ function Walk(ast, deps, scriptPath) {
     return ast;
 }
 
-function TestPoC(source){
+function Bundle(source){
     const ast = ACORN.parse(FS.readFileSync(source), ACORN_OPTIONS);
 
     const deps = {
         '$order': []
     };
-    const processedAst = Walk(ast,deps,__dirname);
+    const fullPathToSource = PATH.resolve(__dirname, source);
+    const processedAst = Walk(ast,deps, PATH.dirname(fullPathToSource) );
 
     const modules = [];
     modules.push(VariableDeclaration([
@@ -106,11 +110,7 @@ function TestPoC(source){
     }
     processedAst.body = modules.concat(processedAst.body);
 
-    if(OUTPUT) {
-        console.log(generate(processedAst)); // TO DO
-    } else {
-        PrettyPrint(processedAst);
-    }
+    return processedAst;
 }
 
 /**
@@ -136,9 +136,9 @@ function HandleImportDeclaration(ast, deps, scriptPath) {
     if(ast.source.type.toUpperCase() !== "LITERAL") throw `${specifier.type} source type handler is not supported <yet>.`;
     const impPath = ast.source.value;
     const impFileName = PATH.basename(impPath);
-    const impFolderPath = getFullImportPath(scriptPath, impPath);
+    const impFolderPath = getFullImportDir(scriptPath, impPath, PATH.join( __dirname, PATH.dirname(SOURCE)) );
 
-    const relImpPath = PATH.join( impFolderPath + impPath.substring( impPath.lastIndexOf('/') ) ).replace(__dirname + '\\','');
+    const relImpPath = PATH.join( impFolderPath, impFileName).replace( PATH.join(__dirname, '/'),'');
     const depName = makeDepName(relImpPath);
 
     if(specifiers.length === 0) { // import side effect
@@ -259,17 +259,15 @@ function getDefaultExportDeclaration(e) { // handle cases like `export default b
     return (e.declaration.type === TYPES.ASSIGNMENT_EXPRESSION) ? e.declaration.right : e.declaration;
 }
 
-function getFullImportPath(scriptPath, impPath) {
-    return impPath.indexOf('./') === 0 
-        ? PATH.resolve( 
-            scriptPath.indexOf( PATH.join(__dirname, SOURCE_DIR) ) == 0 ?  scriptPath : PATH.join(__dirname, SOURCE_DIR), 
-            impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/')) 
-        )
-        :(
-            impPath.indexOf('/') === 0 
-            ? PATH.join( SOURCE_DIR, impPath.substring(0, impPath.lastIndexOf("/")))
-            : impPath.substring(0, impPath.lastIndexOf("/"))
-        );
+function getFullImportDir(consumerDir, impPath, absSrcDir) {
+    if(impPath.indexOf('./') === 0) {
+        const relPathSegment = impPath.replace('./','').substring(0, impPath.replace('./','').lastIndexOf('/'));
+        return PATH.resolve(consumerDir, relPathSegment)
+    } else if(impPath.indexOf('/') === 0) {
+        return PATH.join( absSrcDir, impPath.substring(0, impPath.lastIndexOf("/")))
+    } else {
+        throw new Error('Incorrect import path: ' + impPath);
+    }
 }
 
 function createSetDependencyAst(depRef, name, dependency) {  // ____rv4SET_EXPORT____(depRef, name, value);
@@ -285,3 +283,17 @@ function createSetDependencyAst(depRef, name, dependency) {  // ____rv4SET_EXPOR
         ) 
     );
 };
+
+module.exports = {
+    PrettyPrint,
+    Walk,
+    Bundle,
+    HandleImportDeclaration,
+    checkIfNotResolved,
+    handleDependencyReference,
+    resolveDependency,
+    makeDepName,
+    getDefaultExportDeclaration,
+    getFullImportDir,
+    createSetDependencyAst,
+}
