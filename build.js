@@ -153,18 +153,39 @@ function HandleImportDeclaration(ast, deps, scriptPath) {
     for(let i = 0; i < specifiers.length; i++) {
         const specifier = specifiers[i];
         switch(specifier.type) {
-        case TYPES.IMPORT_DEFAULT_SPECIFIER: {
-            const refAsts = handleDependencyReference(depName, ____rv4DEFEXPORT_, specifier.local.name, deps, impFolderPath, impFileName);
-            constIds.push(refAsts.id);
-            constInits.push(refAsts.init);
-        }; break;
-        case TYPES.IMPORT_SPECIFIER: {
-            const refAsts = handleDependencyReference(depName, specifier.imported.name, specifier.local.name, deps, impFolderPath, impFileName);
-            constIds.push(refAsts.id);
-            constInits.push(refAsts.init);
-        }; break;
-        case TYPES.IMPORT_NAMESPACE_SPECIFIER: 
-            throw `${specifier.type} specifier type handler is not implemented <yet>.`;
+            case TYPES.IMPORT_DEFAULT_SPECIFIER: {
+                const refAsts = handleDependencyReference(depName, ____rv4DEFEXPORT_, specifier.local.name, deps, impFolderPath, impFileName);
+                constIds.push(refAsts.id);
+                constInits.push(refAsts.init);
+            }; break;
+            case TYPES.IMPORT_SPECIFIER: {
+                const refAsts = handleDependencyReference(depName, specifier.imported.name, specifier.local.name, deps, impFolderPath, impFileName);
+                constIds.push(refAsts.id);
+                constInits.push(refAsts.init);
+            }; break;
+            case TYPES.IMPORT_NAMESPACE_SPECIFIER: {
+                const refAsts = handleDependencyReference(depName, '*', specifier.local.name, deps, impFolderPath, impFileName);
+                constIds.push(refAsts.id);
+                constInits.push(
+                    Property(
+                        Identifier(specifier.local.name),
+                        ObjectExpression(
+                            deps.$exportables[depName].map(exportedName => 
+                                Property(
+                                    Identifier(exportedName),
+                                    MemberExpression(
+                                        MemberExpression(
+                                            Identifier(____rv4EXPORT____),
+                                            Literal(depName)
+                                        ),
+                                        Literal(exportedName)
+                                    )
+                                )
+                            )
+                        )
+                    )
+                );
+            }; break;
         }
     }
 
@@ -210,24 +231,36 @@ function resolveDependency(depRef, deps, folderPath, fileName) {
     for(let i=0; i < moduleAst.body.length; i++ ) { //3
         const e = moduleAst.body[i];
         switch (e.type) {
-            case TYPES.EXPORT_DEFAULT_DECLARATION:
-                moduleAst.body[i] = createSetDependencyAst(depRef, ____rv4DEFEXPORT_, getDefaultExportDeclaration(e)); break;
+            case TYPES.EXPORT_DEFAULT_DECLARATION: {
+                addToExportableList(deps, depRef, ____rv4DEFEXPORT_);
+                moduleAst.body[i] = createSetDependencyAst(depRef, ____rv4DEFEXPORT_, getDefaultExportDeclaration(e)); 
+            } break;
             case TYPES.EXPORT_NAMED_DECLARATION: {
                 if(e.specifiers.length) {
-                    const setDependencyAsts = e.specifiers.map(s => createSetDependencyAst(depRef, s.exported.name, s.local) );
+                    const setDependencyAsts = e.specifiers.map(s => {
+                        addToExportableList(deps, depRef, s.exported.name);
+                        return createSetDependencyAst(depRef, s.exported.name, s.local) 
+                    });
                     moduleAst.body.splice(i,1, ...setDependencyAsts);
                 } else if(e.declaration !== null) {
                     const body = [e.declaration];
                     if(e.declaration.type === TYPES.VARIABLE_DECLARATION) {
                         const declarations = e.declaration.declarations;
-                        body.push(...declarations.map( d=>createSetDependencyAst(depRef, d.id.name, Identifier(d.id.name)) ))
+                        body.push(...declarations.map( d=> {
+                            addToExportableList(deps, depRef, d.id.name);
+                            return createSetDependencyAst(depRef, d.id.name, Identifier(d.id.name)) 
+                        }));
                     } else {
                         const declaration = e.declaration;
+                        addToExportableList(deps, depRef, declaration.id.name);
                         body.push(createSetDependencyAst(depRef, declaration.id.name, Identifier(declaration.id.name)))
                     }
                     moduleAst.body.splice(i,1, ...body);
                 }
             }; break;
+            case TYPES.EXPORT_ALL_DECLARATION: 
+                throw `${e.type} specifier type handler is not implemented <yet>.`;
+
             default: moduleAst.body[i] = Walk(e, deps, folderPath);
         }
     };
@@ -283,6 +316,15 @@ function createSetDependencyAst(depRef, name, dependency) {  // ____rv4SET_EXPOR
         ) 
     );
 };
+
+function addToExportableList(deps, depRef, exportableName) {
+    deps.$exportables = deps.$exportables ? deps.$exportables : {};
+    if(deps.$exportables[depRef]) {
+        deps.$exportables[depRef].push(exportableName);
+    } else {
+        deps.$exportables[depRef] = [exportableName];
+    }   
+}
 
 module.exports = {
     PrettyPrint,

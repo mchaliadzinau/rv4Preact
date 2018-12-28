@@ -19,6 +19,7 @@ const TYPES = {
     // not implemented:
     EXPORT_NAMED_DECLARATION:     'ExportNamedDeclaration',
     EXPORT_DEFAULT_DECLARATION:   'ExportDefaultDeclaration',
+    EXPORT_ALL_DECLARATION:       'ExportAllDeclaration',
     IMPORT_SPECIFIER:             'ImportSpecifier',
     IMPORT_NAMESPACE_SPECIFIER:   'ImportNamespaceSpecifier',
     IMPORT_DEFAULT_SPECIFIER:     'ImportDefaultSpecifier',
