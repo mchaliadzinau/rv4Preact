@@ -166,13 +166,13 @@ function HandleImportDeclaration(ast, deps, scriptPath) {
             case TYPES.IMPORT_NAMESPACE_SPECIFIER: {
                 const refAsts = handleDependencyReference(depName, '*', specifier.local.name, deps, impFolderPath, impFileName);
                 constIds.push(refAsts.id);
-                constInits.push(
+                constInits.push( // TO DO Refactor
                     Property(
                         Identifier(specifier.local.name),
                         ObjectExpression(
                             deps.$exportables[depName].map(exportedName => 
                                 Property(
-                                    Identifier(exportedName),
+                                    Identifier(exportedName === ____rv4DEFEXPORT_ ? 'default' : exportedName),
                                     MemberExpression(
                                         MemberExpression(
                                             Identifier(____rv4EXPORT____),
