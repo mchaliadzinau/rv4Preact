@@ -17,10 +17,11 @@ const {
 const ARGS = process.argv.slice(2);
 const SOURCE = ARGS[0],
         OUTPUT = ARGS[1];
-
-const ____rv4EXPORT____ = '____rv4EXPORT____';
-const ____rv4DEFEXPORT_ = '____rv4DEFEXPORT_';
-const ____rv4SET_EXPORT____ = '____rv4SET_EXPORT____';
+// TO DO 
+//      Add check for identifiers presence in processed scripts and handler for this case
+const $rv4EXPORTABLES = '$rv4EXPORTABLES';
+const $rv4DEFEXPORTID = '$rv4DEFEXPORTID';
+const $rv4SETEXPORTED = '$rv4SETEXPORTED';
 
 const ACORN_OPTIONS = {
     sourceType: 'module'
@@ -70,23 +71,23 @@ function Bundle(source){
 
     const modules = [];
     modules.push(VariableDeclaration([
-        VariableDeclarator( Identifier(____rv4EXPORT____), ObjectExpression() )
+        VariableDeclarator( Identifier($rv4EXPORTABLES), ObjectExpression() )
     ]));
-    // "function ____rv4SET_EXPORT____(path,name,value) {
-    //    ____rv4EXPORT____[path] = ____rv4EXPORT____[path] ? ____rv4EXPORT____[path] : {};
-    //    ____rv4EXPORT____[path][name] = value;
+    // "function $rv4SETEXPORTED(path,name,value) {
+    //    $rv4EXPORTABLES[path] = $rv4EXPORTABLES[path] ? $rv4EXPORTABLES[path] : {};
+    //    $rv4EXPORTABLES[path][name] = value;
     // }"
     modules.push(
         FunctionDeclaration(
-            Identifier(____rv4SET_EXPORT____),
+            Identifier($rv4SETEXPORTED),
             [ Identifier("path"), Identifier("name"), Identifier("value") ],
             Block([
                 Expression(
                     Assignment(
-                        MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
+                        MemberExpression( Identifier($rv4EXPORTABLES), Identifier("path") ),
                         Conditional(
-                            MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
-                            MemberExpression( Identifier(____rv4EXPORT____), Identifier("path") ),
+                            MemberExpression( Identifier($rv4EXPORTABLES), Identifier("path") ),
+                            MemberExpression( Identifier($rv4EXPORTABLES), Identifier("path") ),
                             ObjectExpression()
                         )
                     )
@@ -95,7 +96,7 @@ function Bundle(source){
                     Assignment(
                         MemberExpression( 
                             MemberExpression( 
-                                Identifier(____rv4EXPORT____), 
+                                Identifier($rv4EXPORTABLES), 
                                 Identifier("path") ),
                             Identifier("name") 
                         ),
@@ -154,7 +155,7 @@ function HandleImportDeclaration(ast, deps, scriptPath) {
         const specifier = specifiers[i];
         switch(specifier.type) {
             case TYPES.IMPORT_DEFAULT_SPECIFIER: {
-                const refAsts = handleDependencyReference(depName, ____rv4DEFEXPORT_, specifier.local.name, deps, impFolderPath, impFileName);
+                const refAsts = handleDependencyReference(depName, $rv4DEFEXPORTID, specifier.local.name, deps, impFolderPath, impFileName);
                 constIds.push(refAsts.id);
                 constInits.push(refAsts.init);
             }; break;
@@ -172,10 +173,10 @@ function HandleImportDeclaration(ast, deps, scriptPath) {
                         ObjectExpression(
                             deps.$exportables[depName].map(exportedName => 
                                 Property(
-                                    Identifier(exportedName === ____rv4DEFEXPORT_ ? 'default' : exportedName),
+                                    Identifier(exportedName === $rv4DEFEXPORTID ? 'default' : exportedName),
                                     MemberExpression(
                                         MemberExpression(
-                                            Identifier(____rv4EXPORT____),
+                                            Identifier($rv4EXPORTABLES),
                                             Literal(depName)
                                         ),
                                         Literal(exportedName)
@@ -204,10 +205,10 @@ function checkIfNotResolved(deps,name) {
 }
 
 function handleDependencyReference(depName, exportedName, importedName, deps, impFolderPath, impFileName) {
-    //> ____rv4EXPORT____[`depName`][exportedName]
+    //> $rv4EXPORTABLES[`depName`][exportedName]
     const dependencyAst = MemberExpression(
         MemberExpression(
-            Identifier(____rv4EXPORT____),
+            Identifier($rv4EXPORTABLES),
             Literal(depName)
         ),
         Literal(exportedName)
@@ -218,7 +219,7 @@ function handleDependencyReference(depName, exportedName, importedName, deps, im
         resolveDependency(depName, deps, impFolderPath, impFileName);
     }
 
-    return {//> const `importedName` = ____rv4EXPORT____[`depName`][exportedName];
+    return {//> const `importedName` = $rv4EXPORTABLES[`depName`][exportedName];
         id: Property(Identifier(importedName), Identifier(importedName), {shorthand: true}),
         init: Property(Identifier(importedName), dependencyAst)
     };
@@ -232,8 +233,8 @@ function resolveDependency(depRef, deps, folderPath, fileName) {
         const e = moduleAst.body[i];
         switch (e.type) {
             case TYPES.EXPORT_DEFAULT_DECLARATION: {
-                addToExportableList(deps, depRef, ____rv4DEFEXPORT_);
-                moduleAst.body[i] = createSetDependencyAst(depRef, ____rv4DEFEXPORT_, getDefaultExportDeclaration(e)); 
+                addToExportableList(deps, depRef, $rv4DEFEXPORTID);
+                moduleAst.body[i] = createSetDependencyAst(depRef, $rv4DEFEXPORTID, getDefaultExportDeclaration(e)); 
             } break;
             case TYPES.EXPORT_NAMED_DECLARATION: {
                 if(e.specifiers.length) {
@@ -303,7 +304,7 @@ function getFullImportDir(consumerDir, impPath, absSrcDir) {
     }
 }
 
-function createSetDependencyAst(depRef, name, dependency) {  // ____rv4SET_EXPORT____(depRef, name, value);
+function createSetDependencyAst(depRef, name, dependency) {  // $rv4SETEXPORTED(depRef, name, value);
     const arguments = [
         Literal(depRef),   // dependency reference
         Literal(name), // depencency name
@@ -311,7 +312,7 @@ function createSetDependencyAst(depRef, name, dependency) {  // ____rv4SET_EXPOR
     ];
     return Expression( 
         CallExpression(
-            Identifier(____rv4SET_EXPORT____), 
+            Identifier($rv4SETEXPORTED), 
             arguments
         ) 
     );
