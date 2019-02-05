@@ -37,8 +37,28 @@ for(let i = 0; i < depCount; i++) {
     if(packageJSON.module) {
         const moduleSourcePath = path.resolve(packagePath, packageJSON.module);
         try {
-            FS.createReadStream( moduleSourcePath )
-            .pipe(FS.createWriteStream( moduleDestPath ));
+            switch (name) {
+                case 'unistore' : {
+                    const libsUnistorePath = path.resolve(libsPath,'unistore');
+                    const libsUnistorePreactPath = path.resolve(libsUnistorePath,'integrations') ;
+                    if ( !FS.existsSync(libsUnistorePath) ){
+                        FS.mkdirSync(libsUnistorePath);
+                        FS.mkdirSync(libsUnistorePreactPath);
+                    }
+                    FS.createReadStream( moduleSourcePath )
+                    .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `${name}.mjs`)) );
+                    FS.createReadStream( 'node_modules/unistore/src/util.js' )
+                    .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `util.mjs`)) );
+                    FS.createReadStream( 'node_modules/unistore/src/integrations/preact.js' )
+                    .pipe( FS.createWriteStream( path.resolve(libsUnistorePreactPath, `preact.mjs`)) );
+                    console.log(libsUnistorePath, libsUnistorePath, libsUnistorePreactPath)
+                } break; 
+                default : {
+                    FS.createReadStream( moduleSourcePath )
+                    .pipe(FS.createWriteStream( moduleDestPath ));
+                }
+            }
+
         } catch (e) {
             console.error(`ERROR:\t [${name + package.dependencies[name]}] Copying ${moduleSourcePath} to ${moduleDestPath} failed`, e);
         }

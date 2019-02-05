@@ -4,7 +4,35 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Prepare",
+            "runtimeVersion": "8.1.2",
+            "program": "${workspaceFolder}/prepare.js",
+            "args": [
+                "{tree:'IIFE'}"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch BUILD",
+            "runtimeVersion": "8.1.2",
+            "program": "${workspaceFolder}/build.js",
+            "args": [
+                "src/index.js", "out"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch BUILD UNIT TEST",
+            "runtimeVersion": "8.1.2",
+            "program": "${workspaceFolder}/tests/bundler/build.unit.js",
+            "args": [
+            ]
+        },
         {
             "type": "node",
             "request": "launch",
