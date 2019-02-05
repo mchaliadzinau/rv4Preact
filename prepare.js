@@ -6,6 +6,7 @@ const FS = require('fs');
 const path = require('path');
 const ACORN = require("acorn");
 const ASTRING = require('astring')
+const { Transform } = require('stream');
 
 const AST_EXPORT_DEFAULT = require('./ast/ast.export-default.json');
 const package   = require('./package.json');
@@ -16,10 +17,56 @@ const ARGS = process.argv.slice(2);
 const PATH_LIBS = './src/libs/';
 const PATH_MODULES = './node_modules/';
 const ACORN_OPTIONS = {
-    ecmaVersion: 7
+    ecmaVersion: 7,
+    sourceType: 'module'
 }
 
 ARGS.length && console.log(ARGS); // handle agruments to distinguish DEV & PROD
+
+class Es6 extends Transform {
+    constructor(options) {
+      super(options);
+      this.transform = this.transform.bind(this);
+    }
+
+    transform(chunk, encoding, callback) {
+        var upperChunk = chunk.toString().toUpperCase();
+        this.push(upperChunk);
+        console.log(upperChunk);
+        cb();
+    }
+  }
+
+const importSourcesTransform = { 
+    transform(chunk, encoding, callback){ 
+        // TO DO Refactor
+        const ast = ACORN.parse(chunk.toString(), ACORN_OPTIONS);
+        const bodyLength = ast.body.length;
+        let i = 0, souldContinue = true;
+        while (i < bodyLength && souldContinue) {
+            const line = ast.body[i];
+            if(line.type === "ImportDeclaration") {
+                if(line.source.type.toUpperCase() !== "LITERAL") throw `${line.source.type} source type handler is not supported <yet>.`;
+                const depName = line.source.value;
+                if(depName === 'preact') { // TO DO Refactor
+                    line.source.value = '/libs/preact.mjs';
+                    line.source.raw = `'${line.source.value}'`
+                } else {
+                    const extName = path.extname(depName);
+                    switch(extName) {
+                        case '' :   { line.source.value += '.mjs'; line.source.raw = `'${line.source.value}'`} break
+                        case '.js': { line.source.value.replace(/\.js$/,'.mjs'); line.source.raw = `'${line.source.value}'`} break
+                    }
+                }
+            } else {
+                souldContinue = false;
+            }
+            i++;
+        }
+        callback(false, ASTRING.generate(ast))
+        // callback(<error>, <result>) callback(false, <transformed-chunk>); 
+    } 
+};
 
 const depNames  = Object.keys(package.dependencies);
 const libsPath = path.resolve(__dirname, PATH_LIBS);
@@ -45,13 +92,17 @@ for(let i = 0; i < depCount; i++) {
                         FS.mkdirSync(libsUnistorePath);
                         FS.mkdirSync(libsUnistorePreactPath);
                     }
-                    FS.createReadStream( moduleSourcePath )
-                    .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `${name}.mjs`)) );
-                    FS.createReadStream( 'node_modules/unistore/src/util.js' )
-                    .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `util.mjs`)) );
-                    FS.createReadStream( 'node_modules/unistore/src/integrations/preact.js' )
-                    .pipe( FS.createWriteStream( path.resolve(libsUnistorePreactPath, `preact.mjs`)) );
-                    console.log(libsUnistorePath, libsUnistorePath, libsUnistorePreactPath)
+
+                    FS.createReadStream( moduleSourcePath ).pipe(new Transform(importSourcesTransform))
+                        .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `${name}.mjs`)) );
+                    FS.createReadStream( 'node_modules/unistore/src/util.js' ).pipe(new Transform(importSourcesTransform))
+                        .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `util.mjs`)) );
+                    FS.createReadStream( 'node_modules/unistore/src/integrations/preact.js' ).pipe(new Transform(importSourcesTransform))
+                        .pipe( FS.createWriteStream( path.resolve(libsUnistorePreactPath, `preact.mjs`)) );
+
+                    // https://stackoverflow.com/a/40295288/4728612
+                    // FS.createReadStream( 'node_modules/unistore/src/devtools.js' )
+                    //     .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `devtools.mjs`)) );
                 } break; 
                 default : {
                     FS.createReadStream( moduleSourcePath )
@@ -94,4 +145,3 @@ function IIFE2MODULE(scriptPath) {
         throw new Error(`ERROR:\t IIFE not found in script ${scriptPath}`);
     }
 }
-
