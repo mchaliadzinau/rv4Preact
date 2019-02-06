@@ -4,11 +4,11 @@
   * define layout only with JavaScript;
   
   The main idea is to wrap a `createElement` function for easier usage:
-  > `_(name)` - is base higher order function which provides ability to define element-functions.
+  > `$(name)` - is base higher order function which provides ability to define element-functions.
   > If global variable `DEV` is set it also provides params and children typechecks. 
   > * @ `name` : String|Component|HTMLElement
   >
-  > `div(props, ...children)` - element-function used for wrapping `createElement` is a more convinient way. Under the hood it utilizes `_('div')` function.
+  > `div(props, ...children)` - element-function used for wrapping `createElement` is a more convinient way. Under the hood it utilizes `$('div')` function.
   > * @ `props`: Object | null 
   > * @ `children` : String|Component|HTMLElement | ArrayOf(String|Component|HTMLElement))
   >
@@ -17,7 +17,7 @@
   Example: 
 
     // component declaration
-    import { _, div, ul, li } from '/utils/pelems.mjs';
+    import { $, div, ul, li } from '/utils/pelems.mjs';
     const Header = (props) => (
         return div({class: 'header'}, props.children);
     );
@@ -27,7 +27,7 @@
     import Header from './header/Header.mjs'
     ...
         Header({ message: state.message},
-            _('h1')(null, "H E A D E R"),
+            $('h1')(null, "H E A D E R"),
             ul(null, 
                 li(null, "LOWERHEADER")
             )
