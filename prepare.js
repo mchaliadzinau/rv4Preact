@@ -68,6 +68,35 @@ const importSourcesTransform = {
     } 
 };
 
+const CJs2Es6Transform = { 
+    transform(chunk, encoding, callback){ 
+        // TO DO Refactor
+        const ast = ACORN.parse(chunk.toString(), ACORN_OPTIONS);
+        const bodyLength = ast.body.length;
+        let i = 0;
+        while (i < bodyLength) {
+            const line = ast.body[i];
+            if(line.type === "ExpressionStatement" 
+                && line.expression.type === "AssignmentExpression" 
+                && line.expression.left.type === "MemberExpression"
+                && line.expression.left.object.type === "Identifier"
+                && line.expression.left.object.name === "module"
+                && line.expression.left.property.type === "Identifier"
+                && line.expression.left.property.name === "exports"
+             ) {
+                const rightExpression = line.expression.right;
+                ast.body[i] = {
+                    "type": "ExportDefaultDeclaration",
+                    "declaration": rightExpression
+                };
+            }
+            i++;
+        }
+        callback(false, ASTRING.generate(ast))
+        // callback(<error>, <result>) callback(false, <transformed-chunk>); 
+    } 
+};
+
 const depNames  = Object.keys(package.dependencies);
 const libsPath = path.resolve(__dirname, PATH_LIBS);
 if (!FS.existsSync(libsPath)){
@@ -99,6 +128,8 @@ for(let i = 0; i < depCount; i++) {
                         .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `util.mjs`)) );
                     FS.createReadStream( 'node_modules/unistore/src/integrations/preact.js' ).pipe(new Transform(importSourcesTransform))
                         .pipe( FS.createWriteStream( path.resolve(libsUnistorePreactPath, `preact.mjs`)) );
+                    FS.createReadStream( 'node_modules/unistore/devtools.js' ).pipe(new Transform(CJs2Es6Transform))
+                        .pipe( FS.createWriteStream( path.resolve(libsUnistorePath, `devtools.mjs`)) );
 
                     // https://stackoverflow.com/a/40295288/4728612
                     // FS.createReadStream( 'node_modules/unistore/src/devtools.js' )

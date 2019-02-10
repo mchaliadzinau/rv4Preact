@@ -1,10 +1,15 @@
 // import { createElement, div, h1, h2, h3, button, ul, li } from '../node_modules/preact-hyperscript';
 import { Component, createElement, render } from '/libs/preact.mjs';
 import App from './app/App.mjs';
-import createStore from '/libs/unistore/unistore.mjs'
-import { Provider } from '/libs/unistore/integrations/preact.mjs'
+import createStore from '/libs/unistore/unistore.mjs';
+import devtools    from '/libs/unistore/devtools.mjs';
 
-let store = createStore({ count: 1110 })
+import { Provider } from '/libs/unistore/integrations/preact.mjs';
+
+let initialState = { count: 1100 };
+
+let store = !DEV ?  createStore(initialState) : devtools(createStore(initialState));
+
 
 const h = createElement;
 
