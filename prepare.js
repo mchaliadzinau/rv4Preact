@@ -78,17 +78,49 @@ const CJs2Es6Transform = {
             const line = ast.body[i];
             if(line.type === "ExpressionStatement" 
                 && line.expression.type === "AssignmentExpression" 
-                && line.expression.left.type === "MemberExpression"
-                && line.expression.left.object.type === "Identifier"
-                && line.expression.left.object.name === "module"
-                && line.expression.left.property.type === "Identifier"
-                && line.expression.left.property.name === "exports"
-             ) {
-                const rightExpression = line.expression.right;
-                ast.body[i] = {
-                    "type": "ExportDefaultDeclaration",
-                    "declaration": rightExpression
-                };
+                && line.expression.left.type === "MemberExpression") {
+            
+                // handle module.exports case
+                if(line.expression.left.object.type === "Identifier"
+                    && line.expression.left.object.name === "module"
+                    && line.expression.left.property.type === "Identifier"
+                    && line.expression.left.property.name === "exports") {
+                    const rightExpression = line.expression.right;
+                    ast.body[i] = {
+                        "type": "ExportDefaultDeclaration",
+                        "declaration": rightExpression
+                    };
+                }
+
+                // handle module.exports.x case
+                if(line.expression.left.object.type === "MemberExpression"
+                    && line.expression.left.object.object.type === "Identifier"
+                    && line.expression.left.object.object.name === "module"
+                    && line.expression.left.object.object.type === "Identifier"
+                    && line.expression.left.object.property.type === "Identifier") {
+                    
+                    const propName = line.expression.left.object.property.name;
+                    const rightExpression = line.expression.right;
+                    ast.body[i] =     {
+                        "type": "ExportNamedDeclaration",
+                        "declaration": {
+                          "type": "VariableDeclaration",
+                          "declarations": [
+                            {
+                              "type": "VariableDeclarator",
+                              "id": {
+                                "type": "Identifier",
+                                "name": propName
+                              },
+                              "init": rightExpression
+                            }
+                          ],
+                          "kind": "const"
+                        },
+                        "specifiers": [],
+                        "source": null
+                    };
+                }
             }
             i++;
         }
