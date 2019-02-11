@@ -1,4 +1,4 @@
-import { createElement } from '/libs/preact.mjs';
+import { createElement } from '/@/preact.mjs';
 
 function childCheck(child) {
     return typeof child !== 'undefined' && ( // Not necessary in Preact, because props.children is always an Array.

@@ -1,10 +1,10 @@
 // import { createElement, div, h1, h2, h3, button, ul, li } from '../node_modules/preact-hyperscript';
-import { Component, createElement, render } from '/libs/preact.mjs';
+import { Component, createElement, render } from '/@/preact.mjs';
 import App from './app/App.mjs';
-import createStore from '/libs/unistore/unistore.mjs';
-import devtools    from '/libs/unistore/devtools.mjs';
+import createStore from '/@/unistore/unistore.mjs';
+import devtools    from '/@/unistore/devtools.mjs';
 
-import { Provider } from '/libs/unistore/integrations/preact.mjs';
+import { Provider } from '/@/unistore/integrations/preact.mjs';
 
 let initialState = { count: 1100 };
 

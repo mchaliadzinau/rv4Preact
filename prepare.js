@@ -1,5 +1,5 @@
 /**
- * This script copies all dependencies into ./src/libs/ directory
+ * This script copies all dependencies into ./src/@/ directory
  */
 // REQUIREMENTS:
 const FS = require('fs');
@@ -14,7 +14,8 @@ const package   = require('./package.json');
 // ARGS:
 const ARGS = process.argv.slice(2);
 // GLOBAL DATA:
-const PATH_LIBS = './src/libs/';
+const PATH_SRC = './src';
+const FOLDER_LIBS = '/@/';
 const PATH_MODULES = './node_modules/';
 const ACORN_OPTIONS = {
     ecmaVersion: 7,
@@ -49,7 +50,7 @@ const importSourcesTransform = {
                 if(line.source.type.toUpperCase() !== "LITERAL") throw `${line.source.type} source type handler is not supported <yet>.`;
                 const depName = line.source.value;
                 if(depName === 'preact') { // TO DO Refactor
-                    line.source.value = '/libs/preact.mjs';
+                    line.source.value = path.join(FOLDER_LIBS, 'preact.mjs').replace(/\\/g, '/');
                     line.source.raw = `'${line.source.value}'`
                 } else {
                     const extName = path.extname(depName);
@@ -130,7 +131,7 @@ const CJs2Es6Transform = {
 };
 
 const depNames  = Object.keys(package.dependencies);
-const libsPath = path.resolve(__dirname, PATH_LIBS);
+const libsPath = path.resolve(__dirname, path.join(PATH_SRC,FOLDER_LIBS));
 if (!FS.existsSync(libsPath)){
     FS.mkdirSync(libsPath);
 }
